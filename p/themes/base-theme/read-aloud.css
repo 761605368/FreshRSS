@@ -1,16 +1,16 @@
 #read-aloud-button {
     background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5em;
-    margin: 0 0.25em;
+    border: 1px solid #ddd;
     border-radius: 3px;
-    transition: all 0.2s ease;
-    color: inherit;
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    opacity: 0.7;
+    padding: 5px 10px;
+    margin: 0;
+    color: #666;
+    background-color: #fafafa;
+    transition: all 0.2s ease;
 }
 
 #read-aloud-button svg {
@@ -20,20 +20,30 @@
 }
 
 #read-aloud-button:hover {
-    opacity: 1;
+    background-color: #f2f2f2;
+    border-color: #ccc;
 }
 
 #read-aloud-button.active {
-    opacity: 1;
-    color: var(--icon-high-contrast);
+    background-color: #e9e9e9;
+    border-color: #bbb;
+    color: #444;
 }
 
 /* Dark theme support */
 [data-theme="dark"] #read-aloud-button {
-    opacity: 0.8;
+    background-color: #333;
+    border-color: #444;
+    color: #aaa;
 }
 
-[data-theme="dark"] #read-aloud-button:hover,
+[data-theme="dark"] #read-aloud-button:hover {
+    background-color: #3a3a3a;
+    border-color: #555;
+}
+
 [data-theme="dark"] #read-aloud-button.active {
-    opacity: 1;
+    background-color: #404040;
+    border-color: #666;
+    color: #ccc;
 }
