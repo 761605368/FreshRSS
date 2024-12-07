@@ -2,9 +2,11 @@
 
 class TextToSpeechExtension extends Minz_Extension {
     protected array $csp_policies = [
-        'default-src' => '*',
-        'media-src' => 'blob: *',
-        'connect-src' => 'self *'
+        'default-src' => "'self'",
+        'style-src' => "'self' 'unsafe-inline'",
+        'script-src' => "'self' 'unsafe-inline'",
+        'media-src' => "blob: *",
+        'connect-src' => "'self' *"
     ];
 
     public function init(): void {

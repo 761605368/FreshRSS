@@ -19,7 +19,7 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
       <option value="baidu" <?php echo ($tts_service == 'baidu' ? 'selected' : ''); ?>>百度语音</option>
     </select>
 
-    <div id="api_settings" style="display: none;">
+    <div id="api_settings" class="<?php echo $tts_service === 'browser' ? 'hidden' : ''; ?>">
       <label for="tts_api_key">API Key</label>
       <input type="password" name="tts_api_key" id="tts_api_key" value="<?php echo $tts_api_key; ?>">
       
@@ -77,18 +77,19 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
   -webkit-appearance: none;
   margin: 0;
 }
+
+.hidden {
+  display: none;
+}
 </style>
 
 <script>
-document.getElementById('tts_service').addEventListener('change', function() {
-  const apiSettings = document.getElementById('api_settings');
-  apiSettings.style.display = this.value === 'browser' ? 'none' : 'block';
-});
-
-// 初始化时检查是否显示 API 设置
 document.addEventListener('DOMContentLoaded', function() {
-  const service = document.getElementById('tts_service').value;
-  document.getElementById('api_settings').style.display = 
-    service === 'browser' ? 'none' : 'block';
+    const serviceSelect = document.getElementById('tts_service');
+    const apiSettings = document.getElementById('api_settings');
+    
+    serviceSelect.addEventListener('change', function() {
+        apiSettings.classList.toggle('hidden', this.value === 'browser');
+    });
 });
 </script>

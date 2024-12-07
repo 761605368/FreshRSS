@@ -104,3 +104,46 @@
     background: #0056b3;
     transform: scale(1.2);
 }
+
+/* Configuration Form Styles */
+#tts-config {
+    margin: 1em 0;
+}
+
+#tts-config label {
+    display: block;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+}
+
+#tts-config input[type="number"],
+#tts-config input[type="text"],
+#tts-config input[type="password"],
+#tts-config select {
+    width: 200px;
+    padding: 0.5em;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+#tts-config input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+#tts-config input[type="number"]::-webkit-outer-spin-button,
+#tts-config input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+#api_settings {
+    padding: 1em;
+    margin: 1em 0;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+#api_settings.hidden {
+    display: none;
+}
