@@ -6,6 +6,9 @@ class ArticleReader {
         this.synth = window.speechSynthesis;
         this.currentUtterance = null;
         this.isReading = false;
+        this.lastText = null;
+        this.lastPosition = 0;
+        this.currentArticleId = null;
         this.speakerIcon = `<svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
@@ -17,16 +20,46 @@ class ArticleReader {
         </svg>`;
     }
 
-    readArticle(articleContent) {
+    readArticle(articleContent, articleId) {
+        // 如果正在阅读，则暂停
         if (this.isReading) {
             this.stop();
             return;
         }
 
         const text = this.extractTextContent(articleContent);
-        const utterance = new SpeechSynthesisUtterance(text);
+
+        // 如果是同一篇文章，且有上次的位置
+        if (articleId === this.currentArticleId && this.lastText === text && this.lastPosition > 0) {
+            // 从上次位置继续阅读
+            const remainingText = text.substring(this.lastPosition);
+            this.startReading(remainingText, text, articleId);
+        } else {
+            // 新文章从头开始阅读
+            this.lastPosition = 0;
+            this.lastText = text;
+            this.currentArticleId = articleId;
+            this.startReading(text, text, articleId);
+        }
+    }
+
+    startReading(textToRead, fullText, articleId) {
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+
+        utterance.onboundary = (event) => {
+            // 更新当前位置
+            if (event.name === 'word') {
+                this.lastPosition = this.lastPosition + event.charIndex;
+            }
+        };
 
         utterance.onend = () => {
+            // 如果读完了整篇文章，重置位置
+            if (this.lastPosition >= fullText.length) {
+                this.lastPosition = 0;
+                this.lastText = null;
+                this.currentArticleId = null;
+            }
             this.isReading = false;
             this.currentUtterance = null;
             this.updateReadButton();
@@ -70,12 +103,23 @@ class ArticleReader {
     }
 
     updateReadButton() {
+        // 更新工具栏按钮
         const button = document.querySelector('#read-aloud-button');
         if (button) {
             button.classList.toggle('active', this.isReading);
             button.title = this.isReading ? 'Stop reading' : 'Read article aloud';
             button.innerHTML = this.isReading ? this.muteIcon : this.speakerIcon;
         }
+
+        // 更新所有文章标题中的按钮
+        document.querySelectorAll('.article-read-button').forEach(button => {
+            const article = button.closest('.flux');
+            const isCurrentArticle = article && article.querySelector('.content') === this.currentContent;
+            
+            button.classList.toggle('active', this.isReading && isCurrentArticle);
+            button.title = this.isReading && isCurrentArticle ? 'Stop reading' : 'Read article aloud';
+            button.innerHTML = this.isReading && isCurrentArticle ? this.muteIcon : this.speakerIcon;
+        });
     }
 }
 
@@ -112,7 +156,7 @@ function init_tts() {
             if (currentArticle) {
                 const content = currentArticle.querySelector('.content');
                 if (content) {
-                    articleReader.readArticle(content.innerHTML);
+                    articleReader.readArticle(content.innerHTML, currentArticle.id);
                 }
             }
         });
@@ -134,7 +178,7 @@ function init_tts() {
                 e.stopPropagation();
                 const content = article.querySelector('.content');
                 if (content) {
-                    articleReader.readArticle(content.innerHTML);
+                    articleReader.readArticle(content.innerHTML, article.id);
                 }
             });
             
