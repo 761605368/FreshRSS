@@ -1,0 +1,8 @@
+{
+    "name": "TextToSpeech",
+    "author": "FreshRSS",
+    "description": "Add text-to-speech functionality",
+    "version": "0.1",
+    "entrypoint": "TextToSpeech",
+    "type": "user"
+}
