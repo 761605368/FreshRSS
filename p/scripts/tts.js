@@ -108,14 +108,57 @@ function init_tts() {
 
         readButton.addEventListener('click', (e) => {
             e.preventDefault();
-            const activeArticle = document.querySelector('.flux.current');
-            if (activeArticle) {
-                const articleText = activeArticle.querySelector('.flux_content .content');
-                if (articleText) {
-                    articleReader.readArticle(articleText.innerHTML);
+            const currentArticle = document.querySelector('.flux.current');
+            if (currentArticle) {
+                const content = currentArticle.querySelector('.content');
+                if (content) {
+                    articleReader.readArticle(content.innerHTML);
                 }
             }
         });
+    }
+
+    // Add read buttons after article titles
+    function addReadButtonToArticle(article) {
+        const title = article.querySelector('h1.title');
+        if (title && !title.querySelector('.article-read-button')) {
+            const button = document.createElement('button');
+            button.className = 'article-read-button btn';
+            button.innerHTML = articleReader.speakerIcon;
+            button.title = 'Read this article aloud';
+            button.style.marginLeft = '0.5em';
+            button.style.verticalAlign = 'middle';
+            
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const content = article.querySelector('.content');
+                if (content) {
+                    articleReader.readArticle(content.innerHTML);
+                }
+            });
+            
+            title.appendChild(button);
+        }
+    }
+
+    // Add read buttons to existing articles
+    document.querySelectorAll('.flux').forEach(addReadButtonToArticle);
+
+    // Watch for new articles being added
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.classList && node.classList.contains('flux')) {
+                    addReadButtonToArticle(node);
+                }
+            });
+        });
+    });
+
+    const streamNode = document.getElementById('stream');
+    if (streamNode) {
+        observer.observe(streamNode, { childList: true, subtree: true });
     }
 }
 

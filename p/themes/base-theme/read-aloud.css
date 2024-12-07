@@ -1,14 +1,22 @@
-#read-aloud-button .icon {
+#read-aloud-button .icon,
+.article-read-button .icon {
     vertical-align: middle;
     line-height: 1;
 }
 
-#read-aloud-button.active .icon {
+#read-aloud-button.active .icon,
+.article-read-button.active .icon {
     color: var(--frss-switch-accent-color);
 }
 
+.article-read-button {
+    padding: 0.2em 0.5em;
+    font-size: 0.9em;
+}
+
 @media (prefers-color-scheme: dark) {
-    #read-aloud-button .icon {
+    #read-aloud-button .icon,
+    .article-read-button .icon {
         stroke: var(--frss-font-color-light);
     }
 }
