@@ -52,11 +52,11 @@ function startSpeaking(text, button) {
     // 创建新的语音实例
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // 设置语音参数
-    utterance.lang = 'zh-CN'; // 设置为中文
-    utterance.rate = 1.0;     // 语速 (0.1 到 10)
-    utterance.pitch = 1.0;    // 音高 (0 到 2)
-    utterance.volume = 1.0;   // 音量 (0 到 1)
+    // 从按钮的 data 属性获取配置
+    utterance.lang = button.dataset.ttsLang || 'zh-CN';
+    utterance.rate = parseFloat(button.dataset.ttsRate) || 1.0;
+    utterance.pitch = parseFloat(button.dataset.ttsPitch) || 1.0;
+    utterance.volume = parseFloat(button.dataset.ttsVolume) || 1.0;
 
     // 监听语音结束事件
     utterance.onend = () => {

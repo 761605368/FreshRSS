@@ -1,0 +1,63 @@
+<?php
+// 获取当前配置
+$tts_rate = FreshRSS_Context::$user_conf->tts_rate ?? 1.0;
+$tts_pitch = FreshRSS_Context::$user_conf->tts_pitch ?? 1.0;
+$tts_volume = FreshRSS_Context::$user_conf->tts_volume ?? 1.0;
+$tts_lang = FreshRSS_Context::$user_conf->tts_lang ?? 'zh-CN';
+?>
+
+<form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
+  <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
+  
+  <div id="tts-config">
+    <label for="tts_lang">Language</label>
+    <select name="tts_lang" id="tts_lang">
+      <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>Chinese (Simplified)</option>
+      <option value="en-US" <?php echo ($tts_lang == 'en-US' ? 'selected' : ''); ?>>English (US)</option>
+      <option value="ja-JP" <?php echo ($tts_lang == 'ja-JP' ? 'selected' : ''); ?>>Japanese</option>
+    </select>
+
+    <label for="tts_rate">Speech Rate (0.1 - 10)</label>
+    <input type="number" name="tts_rate" id="tts_rate" min="0.1" max="10" step="0.1" value="<?php echo $tts_rate; ?>">
+
+    <label for="tts_pitch">Pitch (0 - 2)</label>
+    <input type="number" name="tts_pitch" id="tts_pitch" min="0" max="2" step="0.1" value="<?php echo $tts_pitch; ?>">
+
+    <label for="tts_volume">Volume (0 - 1)</label>
+    <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
+  </div>
+
+  <hr />
+  <button type="submit">Save</button>
+</form>
+
+<style>
+#tts-config {
+  margin: 1em 0;
+}
+
+#tts-config label {
+  display: block;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+#tts-config input[type="number"],
+#tts-config select {
+  width: 200px;
+  padding: 0.5em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#tts-config input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+#tts-config input[type="number"]::-webkit-outer-spin-button,
+#tts-config input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+</style>
