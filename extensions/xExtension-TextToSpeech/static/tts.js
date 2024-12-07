@@ -1,161 +1,126 @@
-class ArticleReader {
-    constructor() {
-        this.synth = window.speechSynthesis;
-        this.currentUtterance = null;
-        this.activeButton = null;
-        this.currentArticleId = null;
-    }
+// 简单的日志函数
+function log(message) {
+    console.log('TTS Extension:', message);
+}
 
-    showNotification(message, type = 'info') {
-        const notificationElement = document.getElementById('notification');
-        if (!notificationElement) return;
+// 创建 TTS 按钮
+function createTTSButton(articleId) {
+    const button = document.createElement('button');
+    button.className = 'tts-button';
+    button.title = 'Text to Speech';
+    button.dataset.articleId = articleId;
+    button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
+        </svg>`;
+    return button;
+}
 
-        const msgElement = notificationElement.querySelector('.msg');
-        if (!msgElement) return;
+// 为文章添加 TTS 按钮
+function addTTSButtonToArticle(article) {
+    const header = article.querySelector('.flux_header');
+    if (!header) return;
 
-        // 设置消息和类型
-        msgElement.textContent = message;
-        notificationElement.className = 'notification ' + (type === 'error' ? 'bad' : 'good');
-        
-        // 显示通知
-        notificationElement.style.display = 'block';
-        
-        // 3秒后隐藏
-        setTimeout(() => {
-            notificationElement.className = 'notification closed';
-        }, 3000);
-    }
-
-    readArticle(articleElement, articleId) {
-        try {
-            // 如果正在阅读同一篇文章，则停止
-            if (this.currentArticleId === articleId) {
-                this.stop();
-                return;
-            }
-
-            // 如果正在阅读其他文章，先停止
-            if (this.currentUtterance) {
-                this.stop();
-            }
-
-            // 获取文章内容
-            const text = this.extractTextContent(articleElement);
-            if (!text) {
-                this.showNotification('No content to read', 'error');
-                return;
-            }
-
-            // 创建新的语音合成任务
-            const utterance = new SpeechSynthesisUtterance(text);
-            
-            // 设置语音完成回调
-            utterance.onend = () => {
-                this.resetState();
-                this.showNotification('Finished reading');
-            };
-
-            utterance.onerror = (event) => {
-                this.resetState();
-                this.showNotification('Error reading article: ' + event.error, 'error');
-            };
-
-            // 更新状态
-            this.currentUtterance = utterance;
-            this.activeButton = articleElement.querySelector('.tts-button');
-            this.currentArticleId = articleId;
-            
-            // 添加激活状态样式
-            if (this.activeButton) {
-                this.activeButton.classList.add('active');
-            }
-
-            // 开始阅读
-            this.synth.speak(utterance);
-            this.showNotification('Started reading');
-        } catch (error) {
-            console.error('Error in readArticle:', error);
-            this.showNotification('Error: ' + error.message, 'error');
-            this.resetState();
-        }
-    }
-
-    stop() {
-        if (this.currentUtterance) {
-            this.synth.cancel();
-            this.resetState();
-            this.showNotification('Stopped reading');
-        }
-    }
-
-    resetState() {
-        if (this.activeButton) {
-            this.activeButton.classList.remove('active');
-        }
-        this.currentUtterance = null;
-        this.activeButton = null;
-        this.currentArticleId = null;
-    }
-
-    extractTextContent(articleElement) {
-        if (!articleElement) return '';
-
-        // 获取文章内容元素
-        const contentElement = articleElement.querySelector('.content');
-        if (!contentElement) return '';
-
-        // 创建内容副本以进行清理
-        const tempDiv = contentElement.cloneNode(true);
-
-        // 移除不需要的元素
-        const removeSelectors = [
-            'script',
-            'style',
-            'iframe',
-            '.tts-button',
-            '.author',
-            '.date'
-        ];
-
-        removeSelectors.forEach(selector => {
-            tempDiv.querySelectorAll(selector).forEach(el => el.remove());
-        });
-
-        // 获取清理后的文本
-        return tempDiv.textContent.trim()
-            .replace(/\s+/g, ' ')  // 将多个空白字符替换为单个空格
-            .replace(/\n+/g, ' '); // 将换行符替换为空格
-    }
+    const button = createTTSButton(article.getAttribute('id'));
+    header.appendChild(button);
 }
 
 // 初始化函数
-function initializeArticleReader() {
-    // 确保页面已经加载完成
-    if (document.readyState !== 'complete') {
-        window.addEventListener('load', initializeArticleReader);
+function initializeTTS() {
+    // 确保通知元素存在
+    const notification = document.getElementById('notification');
+    if (!notification) {
+        log('Error: Notification element not found');
         return;
     }
 
-    // 确保 FreshRSS 的主要功能已经初始化
-    if (!window.context || !document.querySelector('#stream')) {
-        setTimeout(initializeArticleReader, 100);
+    // 确保关闭按钮存在
+    const closeButton = notification.querySelector('a.close');
+    if (!closeButton) {
+        log('Error: Close button not found');
         return;
     }
 
-    try {
-        if (!window.articleReader) {
-            window.articleReader = new ArticleReader();
-            console.log('TTS: ArticleReader initialized successfully');
+    // 为现有文章添加 TTS 按钮
+    document.querySelectorAll('.flux').forEach(addTTSButtonToArticle);
+
+    // 监听新文章的加载
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.classList && node.classList.contains('flux')) {
+                    addTTSButtonToArticle(node);
+                }
+            });
+        });
+    });
+
+    // 观察文章列表的变化
+    const stream = document.getElementById('stream');
+    if (stream) {
+        observer.observe(stream, { childList: true });
+    }
+
+    // 添加按钮点击事件处理
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('.tts-button');
+        if (!button) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        // 获取文章内容
+        const article = button.closest('.flux');
+        if (!article) {
+            log('Error: Article element not found');
+            return;
         }
-    } catch (error) {
-        console.error('TTS: Failed to initialize ArticleReader:', error);
-        setTimeout(initializeArticleReader, 100);
-    }
+
+        // 移除其他按钮的播放状态
+        document.querySelectorAll('.tts-button.playing').forEach(btn => {
+            if (btn !== button) btn.classList.remove('playing');
+        });
+
+        // 切换当前按钮的播放状态
+        button.classList.toggle('playing');
+
+        // 获取文章文本内容
+        const content = article.querySelector('.content');
+        if (!content) {
+            log('Error: Content element not found');
+            return;
+        }
+
+        // 获取纯文本内容（移除 HTML 标签）
+        const text = content.innerText.trim();
+        
+        // TODO: 实现 TTS 功能
+        log('Article ID: ' + button.dataset.articleId);
+        log('Article text length: ' + text.length);
+    });
+
+    log('TTS Extension initialized successfully');
 }
 
-// 等待 tts_context 准备就绪
-if (window.tts_context) {
-    initializeArticleReader();
-} else {
-    window.addEventListener('ttsContextReady', initializeArticleReader);
-}
+// 记录脚本加载
+log('Script loaded');
+log('Document readyState: ' + document.readyState);
+
+// 等待 FreshRSS 主初始化完成
+const initInterval = setInterval(() => {
+    if (document.readyState === 'complete' && document.getElementById('notification')) {
+        clearInterval(initInterval);
+        // 给 FreshRSS 一点时间完成其他初始化
+        setTimeout(() => {
+            log('Starting TTS initialization');
+            initializeTTS();
+        }, 1000);
+    }
+}, 100);
+
+// 错误处理
+window.addEventListener('error', (event) => {
+    log('Error occurred: ' + event.message);
+    log('Error source: ' + event.filename);
+    log('Error line: ' + event.lineno);
+});
