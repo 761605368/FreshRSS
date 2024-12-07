@@ -1,6 +1,12 @@
 <?php
 
 class TextToSpeechExtension extends Minz_Extension {
+    protected array $csp_policies = [
+        'default-src' => '*',
+        'media-src' => 'blob: *',
+        'connect-src' => 'self *'
+    ];
+
     public function init(): void {
         $this->registerTranslates();
         
