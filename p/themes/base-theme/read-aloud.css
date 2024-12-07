@@ -13,10 +13,11 @@
     transition: all 0.2s ease;
 }
 
-#read-aloud-button svg {
+#read-aloud-button svg.icon {
     width: 16px;
     height: 16px;
     stroke: currentColor;
+    vertical-align: middle;
 }
 
 #read-aloud-button:hover {
@@ -25,9 +26,7 @@
 }
 
 #read-aloud-button.active {
-    background-color: #e9e9e9;
-    border-color: #bbb;
-    color: #444;
+    background-color: #eee;
 }
 
 /* Dark theme support */
