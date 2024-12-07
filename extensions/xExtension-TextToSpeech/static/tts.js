@@ -3,6 +3,10 @@ function log(message) {
     console.log('TTS Extension:', message);
 }
 
+// 语音合成对象
+let speechSynthesis = window.speechSynthesis;
+let currentUtterance = null;
+
 // 创建 TTS 按钮
 function createTTSButton(articleId) {
     const button = document.createElement('button');
@@ -25,8 +29,63 @@ function addTTSButtonToArticle(article) {
     header.appendChild(button);
 }
 
+// 停止当前播放的语音
+function stopSpeaking() {
+    if (currentUtterance) {
+        speechSynthesis.cancel();
+        currentUtterance = null;
+    }
+}
+
+// 开始朗读文本
+function startSpeaking(text, button) {
+    // 如果已经在播放，就停止
+    if (currentUtterance) {
+        stopSpeaking();
+        // 如果点击的是当前正在播放的按钮，就不要重新开始播放
+        if (button.classList.contains('playing')) {
+            button.classList.remove('playing');
+            return;
+        }
+    }
+
+    // 创建新的语音实例
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // 设置语音参数
+    utterance.lang = 'zh-CN'; // 设置为中文
+    utterance.rate = 1.0;     // 语速 (0.1 到 10)
+    utterance.pitch = 1.0;    // 音高 (0 到 2)
+    utterance.volume = 1.0;   // 音量 (0 到 1)
+
+    // 监听语音结束事件
+    utterance.onend = () => {
+        button.classList.remove('playing');
+        currentUtterance = null;
+        log('Speech finished');
+    };
+
+    // 监听语音错误事件
+    utterance.onerror = (event) => {
+        button.classList.remove('playing');
+        currentUtterance = null;
+        log('Speech error:', event.error);
+    };
+
+    // 开始播放
+    currentUtterance = utterance;
+    button.classList.add('playing');
+    speechSynthesis.speak(utterance);
+}
+
 // 初始化函数
 function initializeTTS() {
+    // 检查浏览器是否支持语音合成
+    if (!speechSynthesis) {
+        log('Error: Speech synthesis not supported');
+        return;
+    }
+
     // 确保通知元素存在
     const notification = document.getElementById('notification');
     if (!notification) {
@@ -78,11 +137,11 @@ function initializeTTS() {
 
         // 移除其他按钮的播放状态
         document.querySelectorAll('.tts-button.playing').forEach(btn => {
-            if (btn !== button) btn.classList.remove('playing');
+            if (btn !== button) {
+                btn.classList.remove('playing');
+                stopSpeaking();
+            }
         });
-
-        // 切换当前按钮的播放状态
-        button.classList.toggle('playing');
 
         // 获取文章文本内容
         const content = article.querySelector('.content');
@@ -94,9 +153,8 @@ function initializeTTS() {
         // 获取纯文本内容（移除 HTML 标签）
         const text = content.innerText.trim();
         
-        // TODO: 实现 TTS 功能
-        log('Article ID: ' + button.dataset.articleId);
-        log('Article text length: ' + text.length);
+        // 开始朗读
+        startSpeaking(text, button);
     });
 
     log('TTS Extension initialized successfully');
