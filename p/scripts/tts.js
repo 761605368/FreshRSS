@@ -65,7 +65,7 @@ class ArticleReader {
         if (button) {
             button.classList.toggle('active', this.isReading);
             button.title = this.isReading ? 'Stop reading' : 'Read article aloud';
-            button.innerHTML = this.isReading ? '🔊 Stop' : '🔊 Read';
+            button.innerHTML = '🔊';
         }
     }
 }
@@ -81,27 +81,27 @@ function init_tts() {
 
     articleReader = new ArticleReader();
 
-    // Add read-aloud button to the toolbar
-    const toolbar = document.querySelector('.toolbar');
-    if (toolbar) {
+    // Add read-aloud button to the nav menu
+    const navMenu = document.querySelector('#nav_menu');
+    if (navMenu) {
         const readButton = document.createElement('button');
         readButton.id = 'read-aloud-button';
         readButton.className = 'read-aloud';
-        readButton.innerHTML = '🔊 Read';
+        readButton.innerHTML = '🔊';
         readButton.title = 'Read article aloud';
         
         readButton.addEventListener('click', (e) => {
             e.preventDefault();
             const activeArticle = document.querySelector('.flux.current');
             if (activeArticle) {
-                const articleText = activeArticle.querySelector('.flux_content .text');
+                const articleText = activeArticle.querySelector('.flux_content .content');
                 if (articleText) {
                     articleReader.readArticle(articleText.innerHTML);
                 }
             }
         });
 
-        toolbar.appendChild(readButton);
+        navMenu.appendChild(readButton);
     }
 }
 
