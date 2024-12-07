@@ -1,0 +1,22 @@
+.read-aloud {
+    cursor: pointer;
+    padding: 0 0.5em;
+    transition: background-color 0.2s;
+}
+
+.read-aloud:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.read-aloud.active {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Dark theme support */
+[data-theme="dark"] .read-aloud:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .read-aloud.active {
+    background-color: rgba(255, 255, 255, 0.15);
+}

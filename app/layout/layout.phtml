@@ -62,6 +62,9 @@
 <?php } else { ?>
 		<meta name="robots" content="noindex,nofollow" />
 <?php } ?>
+		<?php FreshRSS::loadStylesAndScripts(); ?>
+		<link rel="stylesheet" href="../themes/base-theme/read-aloud.css" />
+		<script src="../scripts/tts.js" defer></script>
 	</head>
 	<body class="<?= Minz_Request::actionName() ?>">
 <?php
