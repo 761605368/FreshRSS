@@ -12,10 +12,11 @@ class TextToSpeechExtension extends Minz_Extension {
         
         // 注册钩子，在文章显示前添加 TTS 按钮
         $this->registerHook('entry_before_display', array($this, 'addTtsButton'));
-
+        $this->registerHook('nav_reading_modes', array($this, 'addTTSConfig'));
+        
         // 注册控制器
         $this->registerController('TextToSpeech');
-
+        
         // 添加 JavaScript 和 CSS 文件
         Minz_View::appendScript($this->getFileUrl('tts.js', 'js'));
         Minz_View::appendStyle($this->getFileUrl('tts.css', 'css'));
@@ -36,7 +37,7 @@ class TextToSpeechExtension extends Minz_Extension {
         }
     }
     
-    public function addTtsButton($entry) {
+    public function addTTSConfig() {
         // 获取配置
         $tts_rate = FreshRSS_Context::$user_conf->tts_rate ?? 1.0;
         $tts_pitch = FreshRSS_Context::$user_conf->tts_pitch ?? 1.0;
@@ -45,30 +46,32 @@ class TextToSpeechExtension extends Minz_Extension {
         $tts_service = FreshRSS_Context::$user_conf->tts_service ?? 'browser';
         $tts_api_key = FreshRSS_Context::$user_conf->tts_api_key ?? '';
         $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
-
-        // 添加调试日志
-        Minz_Log::debug('TTS Service: ' . $tts_service);
         
-        // 在文章内容前添加 TTS 按钮，并传入配置
-        $button_html = '<button class="tts-button" ' .
-            'data-article-id="' . $entry->id() . '" ' .
-            'data-tts-rate="' . $tts_rate . '" ' .
-            'data-tts-pitch="' . $tts_pitch . '" ' .
-            'data-tts-volume="' . $tts_volume . '" ' .
-            'data-tts-lang="' . $tts_lang . '" ' .
-            'data-tts-service="' . $tts_service . '" ' .
-            'data-tts-api-key="' . htmlspecialchars($tts_api_key, ENT_QUOTES) . '" ' .
-            'data-tts-secret-key="' . htmlspecialchars($tts_secret_key, ENT_QUOTES) . '" ' .
-            'title="Text to Speech">' .
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">' .
-            '<path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>' .
-            '</svg>' .
-            '</button>';
-
-        // 添加调试日志
-        Minz_Log::debug('TTS Button HTML: ' . $button_html);
+        // 创建配置 JavaScript 对象
+        $config = array(
+            'rate' => floatval($tts_rate),
+            'pitch' => floatval($tts_pitch),
+            'volume' => floatval($tts_volume),
+            'lang' => strval($tts_lang),
+            'service' => strval($tts_service),
+            'baiduApiKey' => strval($tts_api_key),
+            'baiduSecretKey' => strval($tts_secret_key)
+        );
         
-        $entry->_content($button_html . $entry->content());
+        // 将配置写入页面，确保 JSON 格式正确
+        $json_config = json_encode($config, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+        echo '<script id="tts-config" type="application/json">' . $json_config . '</script>';
+    }
+    
+    public function addTtsButton($entry) {
+        // 在这里添加按钮的占位符 div，JavaScript 会找到这些 div 并添加按钮
+        $title_button_placeholder = '<div class="tts-button-placeholder title"></div>';
+        $content_button_placeholder = '<div class="tts-button-placeholder content"></div>';
+        
+        // 在标题和内容前添加占位符
+        $entry->_title($title_button_placeholder . $entry->title());
+        $entry->_content($content_button_placeholder . $entry->content());
+        
         return $entry;
     }
 }
