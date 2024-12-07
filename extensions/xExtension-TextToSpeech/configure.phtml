@@ -10,25 +10,25 @@ $tts_lang = FreshRSS_Context::$user_conf->tts_lang ?? 'zh-CN';
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
   
   <div id="tts-config">
-    <label for="tts_lang">Language</label>
+    <label for="tts_lang">语言</label>
     <select name="tts_lang" id="tts_lang">
-      <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>Chinese (Simplified)</option>
-      <option value="en-US" <?php echo ($tts_lang == 'en-US' ? 'selected' : ''); ?>>English (US)</option>
-      <option value="ja-JP" <?php echo ($tts_lang == 'ja-JP' ? 'selected' : ''); ?>>Japanese</option>
+      <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>中文（简体）</option>
+      <option value="en-US" <?php echo ($tts_lang == 'en-US' ? 'selected' : ''); ?>>英语（美国）</option>
+      <option value="ja-JP" <?php echo ($tts_lang == 'ja-JP' ? 'selected' : ''); ?>>日语</option>
     </select>
 
-    <label for="tts_rate">Speech Rate (0.1 - 10)</label>
+    <label for="tts_rate">语速 (0.1 - 10)</label>
     <input type="number" name="tts_rate" id="tts_rate" min="0.1" max="10" step="0.1" value="<?php echo $tts_rate; ?>">
 
-    <label for="tts_pitch">Pitch (0 - 2)</label>
+    <label for="tts_pitch">音调 (0 - 2)</label>
     <input type="number" name="tts_pitch" id="tts_pitch" min="0" max="2" step="0.1" value="<?php echo $tts_pitch; ?>">
 
-    <label for="tts_volume">Volume (0 - 1)</label>
+    <label for="tts_volume">音量 (0 - 1)</label>
     <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
   </div>
 
   <hr />
-  <button type="submit">Save</button>
+  <button type="submit">保存</button>
 </form>
 
 <style>
