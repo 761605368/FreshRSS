@@ -124,7 +124,24 @@ async function handleTTSButtonClick(button, element) {
             return;
         }
         
-        const text = element.textContent.trim();
+        // 获取文章内容
+        let text;
+        const article = element.closest('article');
+        if (!article) {
+            log('找不到文章元素');
+            return;
+        }
+
+        // 如果是标题按钮，获取标题文本
+        if (button.closest('.title')) {
+            const titleElement = article.querySelector('h1');
+            text = titleElement ? titleElement.textContent.trim() : '';
+        } else {
+            // 如果是内容按钮，获取文章主体内容
+            const contentElement = article.querySelector('.content');
+            text = contentElement ? contentElement.textContent.trim() : '';
+        }
+        
         if (!text) {
             log('内容为空');
             return;
@@ -244,16 +261,39 @@ async function speakBaidu(text, button) {
         }
         
         const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
+        const audio = new Audio();
         
-        currentUtterance = audio;
-        button.classList.add('playing');
+        audio.preload = 'auto';
+        
+        // Set up event handlers before setting the source
+        audio.onloadedmetadata = () => {
+            log('音频时长:', audio.duration, '秒');
+        };
+
+        audio.ontimeupdate = () => {
+            log('当前播放时间:', audio.currentTime, '秒');
+        };
+
+        audio.oncanplaythrough = async () => {
+            try {
+                currentUtterance = audio;
+                button.classList.add('playing');
+                log('音频加载完成，开始播放...');
+                await audio.play();
+            } catch (error) {
+                log('播放音频失败:', error);
+                button.classList.remove('playing');
+                URL.revokeObjectURL(audioUrl);
+                currentUtterance = null;
+            }
+        };
         
         audio.onended = () => {
+            const playbackTime = audio.currentTime;
+            log(`百度TTS播放完成，播放时长: ${playbackTime} 秒`);
             button.classList.remove('playing');
             URL.revokeObjectURL(audioUrl);
             currentUtterance = null;
-            log('百度TTS播放完成');
         };
         
         audio.onerror = (e) => {
@@ -264,8 +304,8 @@ async function speakBaidu(text, button) {
             currentUtterance = null;
         };
         
-        log('开始播放音频...');
-        await audio.play();
+        log('加载音频...');
+        audio.src = audioUrl;
     } catch (error) {
         log('百度语音合成错误:', error);
         button.classList.remove('playing');

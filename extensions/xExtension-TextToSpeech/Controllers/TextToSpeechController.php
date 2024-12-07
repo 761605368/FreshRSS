@@ -75,11 +75,11 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
             'cuid' => 'freshrss',
             'ctp' => 1,
             'lan' => 'zh',
-            'spd' => 5,
-            'pit' => 5,
-            'vol' => 5,
-            'per' => 0,
-            'aue' => 3
+            'spd' => 4,  // 语速，取值0-15，默认为5中语速
+            'pit' => 5,  // 音调，取值0-15，默认为5中语调
+            'vol' => 7,  // 音量，取值0-15，默认为5中音量
+            'per' => 0,  // 发音人选择, 0为女声，1为男声，3为情感合成-度逍遥，4为情感合成-度丫丫
+            'aue' => 3   // 3为mp3格式(默认)； 4为pcm-16k；5为pcm-8k；6为wav
         );
         
         Minz_Log::debug('TTS: Requesting Baidu synthesis with params: ' . json_encode($params));
