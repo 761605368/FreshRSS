@@ -20,19 +20,19 @@ class ArticleReader {
         utterance.onend = () => {
             this.isReading = false;
             this.currentUtterance = null;
-            this.updateReadButtons();
+            this.updateReadButton();
         };
 
         utterance.onerror = (event) => {
             console.error('TTS Error:', event.error);
             this.isReading = false;
             this.currentUtterance = null;
-            this.updateReadButtons();
+            this.updateReadButton();
         };
 
         this.currentUtterance = utterance;
         this.isReading = true;
-        this.updateReadButtons();
+        this.updateReadButton();
         this.synth.speak(utterance);
     }
 
@@ -41,7 +41,7 @@ class ArticleReader {
             this.synth.cancel();
             this.isReading = false;
             this.currentUtterance = null;
-            this.updateReadButtons();
+            this.updateReadButton();
         }
     }
 
@@ -60,12 +60,13 @@ class ArticleReader {
         return tempDiv.textContent || tempDiv.innerText || '';
     }
 
-    updateReadButtons() {
-        document.querySelectorAll('.read-aloud').forEach(button => {
+    updateReadButton() {
+        const button = document.querySelector('#read-aloud-button');
+        if (button) {
             button.classList.toggle('active', this.isReading);
             button.title = this.isReading ? 'Stop reading' : 'Read article aloud';
             button.innerHTML = this.isReading ? '🔊 Stop' : '🔊 Read';
-        });
+        }
     }
 }
 
@@ -80,30 +81,28 @@ function init_tts() {
 
     articleReader = new ArticleReader();
 
-    // Add read-aloud button to each article
-    document.querySelectorAll('.flux_content .content').forEach(content => {
-        const header = content.querySelector('header');
-        if (header) {
-            const readButton = document.createElement('div');
-            readButton.className = 'item read-aloud';
-            readButton.innerHTML = '🔊 Read';
-            readButton.title = 'Read article aloud';
-            
-            readButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                const articleText = content.querySelector('.text');
+    // Add read-aloud button to the toolbar
+    const toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+        const readButton = document.createElement('button');
+        readButton.id = 'read-aloud-button';
+        readButton.className = 'read-aloud';
+        readButton.innerHTML = '🔊 Read';
+        readButton.title = 'Read article aloud';
+        
+        readButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            const activeArticle = document.querySelector('.flux.current');
+            if (activeArticle) {
+                const articleText = activeArticle.querySelector('.flux_content .text');
                 if (articleText) {
                     articleReader.readArticle(articleText.innerHTML);
                 }
-            });
-
-            // Add the button to the article header topline
-            const topline = header.querySelector('.article-header-topline');
-            if (topline) {
-                topline.appendChild(readButton);
             }
-        }
-    });
+        });
+
+        toolbar.appendChild(readButton);
+    }
 }
 
 // Initialize TTS when DOM is loaded
