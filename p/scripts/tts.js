@@ -93,11 +93,18 @@ function init_tts() {
     // Add read-aloud button to the toolbar
     const toolbar = document.querySelector('.nav_menu');
     if (toolbar) {
+        // Create a group div for the button
+        const group = document.createElement('div');
+        group.className = 'group';
+        
         const readButton = document.createElement('button');
         readButton.id = 'read-aloud-button';
         readButton.className = 'btn';
         readButton.innerHTML = articleReader.speakerIcon;
         readButton.title = 'Read article aloud';
+        
+        group.appendChild(readButton);
+        toolbar.appendChild(group);
 
         readButton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -109,8 +116,6 @@ function init_tts() {
                 }
             }
         });
-
-        toolbar.appendChild(readButton);
     }
 }
 

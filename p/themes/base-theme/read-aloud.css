@@ -1,48 +1,14 @@
-#read-aloud-button {
-    background: none;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 10px;
-    margin: 0;
-    color: #666;
-    background-color: #fafafa;
-    transition: all 0.2s ease;
-}
-
-#read-aloud-button svg.icon {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
+#read-aloud-button .icon {
     vertical-align: middle;
+    line-height: 1;
 }
 
-#read-aloud-button:hover {
-    background-color: #f2f2f2;
-    border-color: #ccc;
+#read-aloud-button.active .icon {
+    color: var(--frss-switch-accent-color);
 }
 
-#read-aloud-button.active {
-    background-color: #eee;
-}
-
-/* Dark theme support */
-[data-theme="dark"] #read-aloud-button {
-    background-color: #333;
-    border-color: #444;
-    color: #aaa;
-}
-
-[data-theme="dark"] #read-aloud-button:hover {
-    background-color: #3a3a3a;
-    border-color: #555;
-}
-
-[data-theme="dark"] #read-aloud-button.active {
-    background-color: #404040;
-    border-color: #666;
-    color: #ccc;
+@media (prefers-color-scheme: dark) {
+    #read-aloud-button .icon {
+        stroke: var(--frss-font-color-light);
+    }
 }
