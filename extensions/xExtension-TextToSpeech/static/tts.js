@@ -1,4 +1,4 @@
-// 简单的日志函数
+// 日志函数
 function log(message) {
     console.log('TTS Extension:', message);
 }
@@ -6,13 +6,91 @@ function log(message) {
 // 语音合成对象
 let speechSynthesis = window.speechSynthesis;
 let currentUtterance = null;
+let baiduToken = null;
+
+// 获取百度访问令牌
+async function getBaiduToken(apiKey, secretKey) {
+    try {
+        const url = new URL('./index.php', window.location.href);
+        url.searchParams.set('c', 'TextToSpeech');
+        url.searchParams.set('a', 'baiduToken');
+        url.searchParams.set('api_key', apiKey);
+        url.searchParams.set('secret_key', secretKey);
+        
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.access_token) {
+            return data.access_token;
+        } else {
+            throw new Error('No access token in response');
+        }
+    } catch (error) {
+        log('获取百度访问令牌失败:', error);
+        throw error;
+    }
+}
+
+// 使用百度语音合成
+async function speakBaidu(text, button) {
+    try {
+        const apiKey = button.getAttribute('data-tts-api-key');
+        const secretKey = button.getAttribute('data-tts-secret-key');
+        
+        if (!apiKey || !secretKey) {
+            throw new Error('未配置百度语音API密钥');
+        }
+
+        const token = await getBaiduToken(apiKey, secretKey);
+        
+        const url = new URL('./index.php', window.location.href);
+        url.searchParams.set('c', 'TextToSpeech');
+        url.searchParams.set('a', 'baiduSynthesize');
+        url.searchParams.set('token', token);
+        url.searchParams.set('text', text);
+        
+        const response = await fetch(url.toString());
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        
+        currentUtterance = audio;
+        button.classList.add('playing');
+        
+        audio.onended = () => {
+            button.classList.remove('playing');
+            URL.revokeObjectURL(audioUrl);
+            currentUtterance = null;
+        };
+        
+        audio.onerror = () => {
+            button.classList.remove('playing');
+            URL.revokeObjectURL(audioUrl);
+            currentUtterance = null;
+            log('音频播放失败');
+        };
+        
+        await audio.play();
+    } catch (error) {
+        log('百度语音合成错误:', error);
+        button.classList.remove('playing');
+        throw error;
+    }
+}
 
 // 创建 TTS 按钮
 function createTTSButton(articleId) {
     const button = document.createElement('button');
     button.className = 'tts-button';
     button.title = 'Text to Speech';
-    button.dataset.articleId = articleId;
+    button.setAttribute('data-article-id', articleId);
     button.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
@@ -37,8 +115,43 @@ function stopSpeaking() {
     }
 }
 
+// 使用浏览器原生语音合成
+function speakBrowser(text, button) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // 验证并设置语音参数，使用默认值作为后备
+    utterance.lang = button.getAttribute('data-tts-lang') || 'zh-CN';
+    
+    // 速率范围：0.1 到 10
+    const rate = parseFloat(button.getAttribute('data-tts-rate'));
+    utterance.rate = (!isNaN(rate) && isFinite(rate)) ? Math.max(0.1, Math.min(10, rate)) : 1.0;
+    
+    // 音调范围：0 到 2
+    const pitch = parseFloat(button.getAttribute('data-tts-pitch'));
+    utterance.pitch = (!isNaN(pitch) && isFinite(pitch)) ? Math.max(0, Math.min(2, pitch)) : 1.0;
+    
+    // 音量范围：0 到 1
+    const volume = parseFloat(button.getAttribute('data-tts-volume'));
+    utterance.volume = (!isNaN(volume) && isFinite(volume)) ? Math.max(0, Math.min(1, volume)) : 1.0;
+
+    utterance.onend = () => {
+        button.classList.remove('playing');
+        currentUtterance = null;
+    };
+
+    utterance.onerror = (event) => {
+        button.classList.remove('playing');
+        currentUtterance = null;
+        log('语音合成错误:', event.error);
+    };
+
+    currentUtterance = utterance;
+    button.classList.add('playing');
+    speechSynthesis.speak(utterance);
+}
+
 // 开始朗读文本
-function startSpeaking(text, button) {
+async function startSpeaking(text, button) {
     // 如果已经在播放，就停止
     if (currentUtterance) {
         stopSpeaking();
@@ -49,33 +162,29 @@ function startSpeaking(text, button) {
         }
     }
 
-    // 创建新的语音实例
-    const utterance = new SpeechSynthesisUtterance(text);
+    // 移除其他按钮的播放状态
+    document.querySelectorAll('.tts-button.playing').forEach(btn => {
+        if (btn !== button) {
+            btn.classList.remove('playing');
+        }
+    });
+
+    // 根据选择的服务进行语音合成
+    const service = button.getAttribute('data-tts-service');
+    log('使用语音服务:', service);
+    log('按钮属性:', {
+        service: button.getAttribute('data-tts-service'),
+        lang: button.getAttribute('data-tts-lang'),
+        rate: button.getAttribute('data-tts-rate'),
+        pitch: button.getAttribute('data-tts-pitch'),
+        volume: button.getAttribute('data-tts-volume')
+    });
     
-    // 从按钮的 data 属性获取配置
-    utterance.lang = button.dataset.ttsLang || 'zh-CN';
-    utterance.rate = parseFloat(button.dataset.ttsRate) || 1.0;
-    utterance.pitch = parseFloat(button.dataset.ttsPitch) || 1.0;
-    utterance.volume = parseFloat(button.dataset.ttsVolume) || 1.0;
-
-    // 监听语音结束事件
-    utterance.onend = () => {
-        button.classList.remove('playing');
-        currentUtterance = null;
-        log('Speech finished');
-    };
-
-    // 监听语音错误事件
-    utterance.onerror = (event) => {
-        button.classList.remove('playing');
-        currentUtterance = null;
-        log('Speech error:', event.error);
-    };
-
-    // 开始播放
-    currentUtterance = utterance;
-    button.classList.add('playing');
-    speechSynthesis.speak(utterance);
+    if (service === 'baidu') {
+        await speakBaidu(text, button);
+    } else {
+        speakBrowser(text, button);
+    }
 }
 
 // 初始化函数
@@ -83,20 +192,6 @@ function initializeTTS() {
     // 检查浏览器是否支持语音合成
     if (!speechSynthesis) {
         log('Error: Speech synthesis not supported');
-        return;
-    }
-
-    // 确保通知元素存在
-    const notification = document.getElementById('notification');
-    if (!notification) {
-        log('Error: Notification element not found');
-        return;
-    }
-
-    // 确保关闭按钮存在
-    const closeButton = notification.querySelector('a.close');
-    if (!closeButton) {
-        log('Error: Close button not found');
         return;
     }
 
@@ -135,14 +230,6 @@ function initializeTTS() {
             return;
         }
 
-        // 移除其他按钮的播放状态
-        document.querySelectorAll('.tts-button.playing').forEach(btn => {
-            if (btn !== button) {
-                btn.classList.remove('playing');
-                stopSpeaking();
-            }
-        });
-
         // 获取文章文本内容
         const content = article.querySelector('.content');
         if (!content) {
@@ -161,7 +248,7 @@ function initializeTTS() {
 }
 
 // 记录脚本加载
-log('Script loaded');
+log('TTS Extension script loaded');
 log('Document readyState: ' + document.readyState);
 
 // 等待 FreshRSS 主初始化完成

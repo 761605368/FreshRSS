@@ -4,12 +4,29 @@ $tts_rate = FreshRSS_Context::$user_conf->tts_rate ?? 1.0;
 $tts_pitch = FreshRSS_Context::$user_conf->tts_pitch ?? 1.0;
 $tts_volume = FreshRSS_Context::$user_conf->tts_volume ?? 1.0;
 $tts_lang = FreshRSS_Context::$user_conf->tts_lang ?? 'zh-CN';
+$tts_service = FreshRSS_Context::$user_conf->tts_service ?? 'browser';
+$tts_api_key = FreshRSS_Context::$user_conf->tts_api_key ?? '';
+$tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
 ?>
 
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
   
   <div id="tts-config">
+    <label for="tts_service">语音服务</label>
+    <select name="tts_service" id="tts_service">
+      <option value="browser" <?php echo ($tts_service == 'browser' ? 'selected' : ''); ?>>浏览器原生</option>
+      <option value="baidu" <?php echo ($tts_service == 'baidu' ? 'selected' : ''); ?>>百度语音</option>
+    </select>
+
+    <div id="api_settings" style="display: none;">
+      <label for="tts_api_key">API Key</label>
+      <input type="password" name="tts_api_key" id="tts_api_key" value="<?php echo $tts_api_key; ?>">
+      
+      <label for="tts_secret_key">Secret Key</label>
+      <input type="password" name="tts_secret_key" id="tts_secret_key" value="<?php echo $tts_secret_key; ?>">
+    </div>
+
     <label for="tts_lang">语言</label>
     <select name="tts_lang" id="tts_lang">
       <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>中文（简体）</option>
@@ -61,3 +78,17 @@ $tts_lang = FreshRSS_Context::$user_conf->tts_lang ?? 'zh-CN';
   margin: 0;
 }
 </style>
+
+<script>
+document.getElementById('tts_service').addEventListener('change', function() {
+  const apiSettings = document.getElementById('api_settings');
+  apiSettings.style.display = this.value === 'browser' ? 'none' : 'block';
+});
+
+// 初始化时检查是否显示 API 设置
+document.addEventListener('DOMContentLoaded', function() {
+  const service = document.getElementById('tts_service').value;
+  document.getElementById('api_settings').style.display = 
+    service === 'browser' ? 'none' : 'block';
+});
+</script>
