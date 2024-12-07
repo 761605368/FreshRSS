@@ -7,30 +7,25 @@
     border-radius: 3px;
     transition: all 0.2s ease;
     color: inherit;
-    font-size: 1.2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     opacity: 0.7;
+}
+
+#read-aloud-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
 }
 
 #read-aloud-button:hover {
     opacity: 1;
-    transform: scale(1.1);
 }
 
 #read-aloud-button.active {
     opacity: 1;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.1);
-    }
-    100% {
-        transform: scale(1);
-    }
+    color: var(--icon-high-contrast);
 }
 
 /* Dark theme support */

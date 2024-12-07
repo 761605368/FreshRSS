@@ -6,6 +6,15 @@ class ArticleReader {
         this.synth = window.speechSynthesis;
         this.currentUtterance = null;
         this.isReading = false;
+        this.speakerIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+        </svg>`;
+        this.muteIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="22" y1="2" x2="2" y2="22"></line>
+        </svg>`;
     }
 
     readArticle(articleContent) {
@@ -65,7 +74,7 @@ class ArticleReader {
         if (button) {
             button.classList.toggle('active', this.isReading);
             button.title = this.isReading ? 'Stop reading' : 'Read article aloud';
-            button.innerHTML = '🔊';
+            button.innerHTML = this.isReading ? this.muteIcon : this.speakerIcon;
         }
     }
 }
@@ -81,13 +90,13 @@ function init_tts() {
 
     articleReader = new ArticleReader();
 
-    // Add read-aloud button to the nav menu
-    const navMenu = document.querySelector('#nav_menu');
-    if (navMenu) {
+    // Add read-aloud button to the toolbar
+    const toolbar = document.querySelector('.nav_menu');
+    if (toolbar) {
         const readButton = document.createElement('button');
         readButton.id = 'read-aloud-button';
         readButton.className = 'read-aloud';
-        readButton.innerHTML = '🔊';
+        readButton.innerHTML = articleReader.speakerIcon;
         readButton.title = 'Read article aloud';
         
         readButton.addEventListener('click', (e) => {
@@ -101,7 +110,7 @@ function init_tts() {
             }
         });
 
-        navMenu.appendChild(readButton);
+        toolbar.appendChild(readButton);
     }
 }
 
