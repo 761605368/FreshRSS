@@ -1,6 +1,6 @@
 // 日志函数
-function log(message) {
-    console.log('TTS Extension:', message);
+function log(...args) {
+    console.log('TTS Extension:', ...args);
 }
 
 // 语音合成对象
@@ -17,16 +17,28 @@ async function getBaiduToken(apiKey, secretKey) {
         url.searchParams.set('api_key', apiKey);
         url.searchParams.set('secret_key', secretKey);
         
+        log('请求百度访问令牌, URL:', url.toString());
         const response = await fetch(url.toString());
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            log('获取令牌失败:', errorText);
+            throw new Error(`获取令牌失败: ${response.status} - ${errorText}`);
         }
+        
         const data = await response.json();
-        if (data.access_token) {
-            return data.access_token;
-        } else {
-            throw new Error('No access token in response');
+        log('获取令牌响应:', JSON.stringify(data, null, 2));
+        
+        if (data.error) {
+            throw new Error(data.error);
         }
+        
+        if (!data.access_token) {
+            throw new Error('响应中没有访问令牌');
+        }
+        
+        log('成功获取访问令牌');
+        return data.access_token;
     } catch (error) {
         log('获取百度访问令牌失败:', error);
         throw error;
@@ -38,6 +50,8 @@ async function speakBaidu(text, button) {
     try {
         const apiKey = button.getAttribute('data-tts-api-key');
         const secretKey = button.getAttribute('data-tts-secret-key');
+        
+        log('API配置:', { apiKey: !!apiKey, secretKey: !!secretKey });
         
         if (!apiKey || !secretKey) {
             throw new Error('未配置百度语音API密钥');
@@ -51,13 +65,31 @@ async function speakBaidu(text, button) {
         url.searchParams.set('token', token);
         url.searchParams.set('text', text);
         
+        log('请求语音合成, URL:', url.toString());
         const response = await fetch(url.toString());
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            log('语音合成失败:', errorText);
+            throw new Error(`语音合成失败: ${response.status} - ${errorText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        log('响应内容类型:', contentType);
+        
+        if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            log('语音合成返回错误:', errorData);
+            throw new Error(errorData.error || '语音合成失败');
         }
 
         const audioBlob = await response.blob();
+        log('获取到音频数据，大小:', audioBlob.size, '字节');
+        
+        if (audioBlob.size === 0) {
+            throw new Error('获取到的音频数据为空');
+        }
+        
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
         
@@ -68,50 +100,23 @@ async function speakBaidu(text, button) {
             button.classList.remove('playing');
             URL.revokeObjectURL(audioUrl);
             currentUtterance = null;
+            log('音频播放完成');
         };
         
-        audio.onerror = () => {
+        audio.onerror = (e) => {
+            const error = e.target.error;
+            log('音频播放失败:', error ? error.message : '未知错误');
             button.classList.remove('playing');
             URL.revokeObjectURL(audioUrl);
             currentUtterance = null;
-            log('音频播放失败');
         };
         
+        log('开始播放音频...');
         await audio.play();
     } catch (error) {
         log('百度语音合成错误:', error);
         button.classList.remove('playing');
         throw error;
-    }
-}
-
-// 创建 TTS 按钮
-function createTTSButton(articleId) {
-    const button = document.createElement('button');
-    button.className = 'tts-button';
-    button.title = 'Text to Speech';
-    button.setAttribute('data-article-id', articleId);
-    button.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
-        </svg>`;
-    return button;
-}
-
-// 为文章添加 TTS 按钮
-function addTTSButtonToArticle(article) {
-    const header = article.querySelector('.flux_header');
-    if (!header) return;
-
-    const button = createTTSButton(article.getAttribute('id'));
-    header.appendChild(button);
-}
-
-// 停止当前播放的语音
-function stopSpeaking() {
-    if (currentUtterance) {
-        speechSynthesis.cancel();
-        currentUtterance = null;
     }
 }
 
@@ -187,6 +192,36 @@ async function startSpeaking(text, button) {
     }
 }
 
+// 停止当前播放的语音
+function stopSpeaking() {
+    if (currentUtterance) {
+        speechSynthesis.cancel();
+        currentUtterance = null;
+    }
+}
+
+// 创建 TTS 按钮
+function createTTSButton(articleId) {
+    const button = document.createElement('button');
+    button.className = 'tts-button';
+    button.title = 'Text to Speech';
+    button.setAttribute('data-article-id', articleId);
+    button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z"/>
+        </svg>`;
+    return button;
+}
+
+// 为文章添加 TTS 按钮
+function addTTSButtonToArticle(article) {
+    const header = article.querySelector('.flux_header');
+    if (!header) return;
+
+    const button = createTTSButton(article.getAttribute('id'));
+    header.appendChild(button);
+}
+
 // 初始化函数
 function initializeTTS() {
     // 检查浏览器是否支持语音合成
@@ -241,7 +276,10 @@ function initializeTTS() {
         const text = content.innerText.trim();
         
         // 开始朗读
-        startSpeaking(text, button);
+        startSpeaking(text, button).catch((error) => {
+            log('TTS处理错误:', error);
+            alert('语音合成失败: ' + error.message);
+        });
     });
 
     log('TTS Extension initialized successfully');

@@ -9,6 +9,7 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
         $secret_key = Minz_Request::param('secret_key');
         
         if (!$api_key || !$secret_key) {
+            Minz_Log::error('TTS: Missing API credentials');
             http_response_code(400);
             echo json_encode(['error' => 'Missing API credentials']);
             return;
@@ -21,15 +22,31 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
             'client_secret' => $secret_key
         );
         
+        Minz_Log::debug('TTS: Requesting Baidu token with params: ' . json_encode($params));
+        
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url . '?' . http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // 禁用SSL验证，仅用于测试
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);  // 设置超时时间
+        
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
         curl_close($ch);
         
+        if ($error) {
+            Minz_Log::error('TTS: Baidu token request failed: ' . $error);
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to get token: ' . $error]);
+            return;
+        }
+        
+        Minz_Log::debug('TTS: Baidu token response: ' . $response);
+        Minz_Log::debug('TTS: Baidu token HTTP code: ' . $httpCode);
+        
         if ($httpCode !== 200) {
-            http_response_code(400);
+            http_response_code($httpCode);
             echo json_encode(['error' => 'Failed to get token']);
             return;
         }
@@ -44,6 +61,7 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
         $token = Minz_Request::param('token');
         
         if (!$text || !$token) {
+            Minz_Log::error('TTS: Missing text or token');
             header('Content-Type: application/json');
             http_response_code(400);
             echo json_encode(['error' => 'Missing required parameters']);
@@ -64,21 +82,59 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
             'aue' => 3
         );
         
+        Minz_Log::debug('TTS: Requesting Baidu synthesis with params: ' . json_encode($params));
+        
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url . '?' . http_build_query($params));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // 禁用SSL验证，仅用于测试
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);  // 设置超时时间
+        
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $error = curl_error($ch);
+        $responseSize = strlen($response);
         curl_close($ch);
         
-        if ($httpCode !== 200) {
+        Minz_Log::debug('TTS: Baidu synthesis response size: ' . $responseSize . ' bytes');
+        Minz_Log::debug('TTS: Baidu synthesis HTTP code: ' . $httpCode);
+        Minz_Log::debug('TTS: Baidu synthesis content type: ' . $contentType);
+        
+        if ($error) {
+            Minz_Log::error('TTS: Baidu synthesis request failed: ' . $error);
             header('Content-Type: application/json');
-            http_response_code(400);
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to get audio: ' . $error]);
+            return;
+        }
+        
+        if ($httpCode !== 200) {
+            Minz_Log::error('TTS: Baidu synthesis failed with HTTP code: ' . $httpCode);
+            header('Content-Type: application/json');
+            http_response_code($httpCode);
             echo json_encode(['error' => 'Failed to get audio']);
             return;
         }
         
+        if (strpos($contentType, 'application/json') !== false) {
+            Minz_Log::error('TTS: Baidu synthesis returned error: ' . $response);
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo $response;
+            return;
+        }
+        
+        if ($responseSize === 0) {
+            Minz_Log::error('TTS: Baidu synthesis returned empty response');
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode(['error' => 'Empty response from server']);
+            return;
+        }
+        
         header('Content-Type: audio/mp3');
+        header('Content-Length: ' . $responseSize);
         echo $response;
     }
 }
