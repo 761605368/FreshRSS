@@ -2,6 +2,9 @@
 	declare(strict_types=1);
 	/** @var FreshRSS_View $this */
 ?>
+<?php
+    header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; media-src 'self' blob: *;");
+?>
 <header class="header">
 	<div class="item title">
 		<a href="<?= Minz_Url::display(['c' => 'index', 'a' => 'index'], 'html', 'root') ?>">

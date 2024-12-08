@@ -1,6 +1,12 @@
 <?php
 
 class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
+    public function __construct() {
+        parent::__construct();
+        // 添加允许blob URL的Content Security Policy
+        header("Content-Security-Policy: default-src 'self'; media-src 'self' blob: *;");
+    }
+
     public function baiduTokenAction() {
         $this->view->_layout(false);
         header('Content-Type: application/json');
@@ -304,6 +310,46 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
             header('HTTP/1.1 500 Internal Server Error');
             echo json_encode(['error' => $e->getMessage()]);
         }
+    }
+
+    public function playAudioAction() {
+        $this->view->_layout(false);
+        
+        $url = Minz_Request::param('url');
+        if (!$url) {
+            header('HTTP/1.1 400 Bad Request');
+            die('Missing URL parameter');
+        }
+
+        // 验证URL是否来自百度
+        if (!preg_match('/^http:\/\/aipe-speech\.bj\.bcebos\.com\//', $url)) {
+            header('HTTP/1.1 403 Forbidden');
+            die('Invalid audio URL');
+        }
+
+        // 获取音频内容
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        $audio = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            header('HTTP/1.1 502 Bad Gateway');
+            die('Failed to fetch audio');
+        }
+
+        // 设置响应头
+        header('Content-Type: audio/mpeg');
+        header('Content-Length: ' . strlen($audio));
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: public, max-age=31536000');
+        
+        // 输出音频数据
+        echo $audio;
+        exit;
     }
 
     private function splitText($text) {

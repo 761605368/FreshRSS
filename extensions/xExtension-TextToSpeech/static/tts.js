@@ -46,20 +46,58 @@ function generateHash(text) {
     return hash.toString();
 }
 
+// 下载音频并缓存
+async function downloadAndCacheAudio(url, hash) {
+    try {
+        log('开始下载音频:', url);
+        await saveToCache(hash, null, {
+            url: url
+        });
+        return url;
+    } catch (error) {
+        log('下载音频失败:', error);
+        throw error;
+    }
+}
+
+// 创建代理音频URL
+function createProxyUrl(url) {
+    const proxyUrl = new URL('./index.php', window.location.href);
+    proxyUrl.searchParams.set('c', 'TextToSpeech');
+    proxyUrl.searchParams.set('a', 'playAudio');
+    proxyUrl.searchParams.set('url', url);
+    return proxyUrl.toString();
+}
+
+// 创建音频播放器
+function createAudioPlayer(url) {
+    const audio = new Audio();
+    const proxyUrl = createProxyUrl(url);
+    log('使用代理URL播放:', proxyUrl);
+    audio.src = proxyUrl;
+    return audio;
+}
+
 // 保存音频到缓存
-async function saveToCache(hash, taskId, audioUrl) {  
+async function saveToCache(hash, taskId, audioInfo) {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([STORE_NAME], 'readwrite');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.put({
             hash,
             taskId,
-            audioUrl,  
+            audioInfo,
             timestamp: Date.now()
         });
 
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            log('音频信息已缓存, hash:', hash);
+            resolve();
+        };
+        request.onerror = (error) => {
+            log('缓存音频信息失败:', error);
+            reject(request.error);
+        };
     });
 }
 
@@ -72,20 +110,19 @@ async function getFromCache(hash) {
 
         request.onsuccess = () => {
             const result = request.result;
-            if (result && result.audioUrl) {  
+            if (result && result.audioInfo) {
+                log('从缓存获取到音频信息, hash:', hash);
                 resolve(result);
             } else {
+                log('缓存中没有找到音频信息, hash:', hash);
                 resolve(null);
             }
         };
-        request.onerror = () => reject(request.error);
+        request.onerror = (error) => {
+            log('获取缓存失败:', error);
+            reject(request.error);
+        };
     });
-}
-
-// 下载音频并缓存
-async function downloadAndCacheAudio(url, hash) {
-    await saveToCache(hash, null, url);
-    return url;
 }
 
 // 获取配置
@@ -311,11 +348,11 @@ async function speakBaidu(text, button) {
         const hash = generateHash(text);
         const cached = await getFromCache(hash);
         
-        if (cached && cached.audioUrl) {
+        if (cached && cached.audioInfo) {
             log('使用缓存的音频');
-            const audio = new Audio();
+            const audio = createAudioPlayer(cached.audioInfo.url);
             currentAudio = audio;
-            setupAudioEvents(audio, button, cached.audioUrl);
+            setupAudioEvents(audio, button);
             return;
         }
 
@@ -410,12 +447,8 @@ async function speakBaidu(text, button) {
             if (queryResult.error) {
                 throw new Error(queryResult.error);
             }
-            if (!queryResult.tasks_info) {
-                throw new Error('响应中没有任务信息');
-            }
 
             const taskInfo = queryResult.tasks_info[0];
-
             if (!taskInfo) {
                 throw new Error('未找到任务信息');
             }
@@ -428,15 +461,15 @@ async function speakBaidu(text, button) {
                     throw new Error('未找到音频URL');
                 }
 
-                log('获取到音频URL:', audioUrl);  
+                log('获取到音频URL:', audioUrl);
 
                 // 下载并缓存音频
-                const audioBlob = await downloadAndCacheAudio(audioUrl, hash);
+                await downloadAndCacheAudio(audioUrl, hash);
                 
                 // 创建音频对象并播放
-                const audio = new Audio();
+                const audio = createAudioPlayer(audioUrl);
                 currentAudio = audio;
-                setupAudioEvents(audio, button, audioBlob);
+                setupAudioEvents(audio, button);
                 return;
 
             } else if (taskInfo.task_status === 'Failed') {
@@ -458,7 +491,7 @@ async function speakBaidu(text, button) {
 }
 
 // 设置音频事件
-function setupAudioEvents(audio, button, audioUrl) {
+function setupAudioEvents(audio, button) {
     audio.preload = 'auto';
 
     audio.onloadedmetadata = () => {
@@ -472,7 +505,7 @@ function setupAudioEvents(audio, button, audioUrl) {
         try {
             await audio.play();
         } catch (error) {
-            log('播放失败:', error);
+            log('播放失败:', error, '音频URL:', audio.src);
             button.classList.remove('playing');
             currentAudio = null;
         }
@@ -487,13 +520,11 @@ function setupAudioEvents(audio, button, audioUrl) {
 
     audio.onerror = (e) => {
         const error = e.target.error;
-        log('播放错误:', error ? error.message : '未知错误');
+        log('播放错误:', error ? error.message : '未知错误', '音频URL:', audio.src);
         button.classList.remove('loading', 'playing');
         currentAudio = null;
         button.setAttribute('title', '朗读文本');
     };
-
-    audio.src = audioUrl;
 }
 
 // 获取百度访问令牌

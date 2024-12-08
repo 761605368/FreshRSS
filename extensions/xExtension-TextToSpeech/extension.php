@@ -6,6 +6,9 @@ class TextToSpeechExtension extends Minz_Extension {
     ];
 
     public function init(): void {
+        // 添加CSP头
+        header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; media-src 'self' blob: *;", false);
+        
         $this->registerTranslates();
 
         // 注册钩子，在文章显示前添加 TTS 按钮

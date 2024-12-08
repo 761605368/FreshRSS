@@ -65,6 +65,8 @@ class FreshRSS extends Minz_FrontController {
 			self::checkEmailValidated();
 		}
 
+		self::initHeaders();
+
 		Minz_ExtensionManager::callHookVoid('freshrss_init');
 	}
 
@@ -172,5 +174,10 @@ class FreshRSS extends Minz_FrontController {
 				'a' => 'validateEmail',
 			], true);
 		}
+	}
+
+	public static function initHeaders() {
+		header("Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; media-src 'self' blob: *;");
+		// 其他header设置...
 	}
 }
