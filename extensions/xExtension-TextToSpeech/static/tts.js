@@ -133,8 +133,7 @@ async function handleTTSButtonClick(button, element) {
         }
 
 		const contentElement = fluxElement.querySelector('.content');
-		text = contentElement ? contentElement.textContent.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5，。！；：、？]+/g, '')
-			.replace(/\s+/g, ' ')	: '';
+		text = contentElement ? contentElement.textContent.trim()	: '';
 
         if (!text) {
             log('内容为空');
@@ -215,92 +214,174 @@ async function speakBaidu(text, button) {
     try {
         const apiKey = button.getAttribute('data-tts-api-key');
         const secretKey = button.getAttribute('data-tts-secret-key');
-        const lang = button.getAttribute('data-tts-lang');
+        const voice = parseInt(button.getAttribute('data-tts-voice') || '0');
 
-        log('API配置:', { apiKey: !!apiKey, secretKey: !!secretKey });
+        log('API配置:', { apiKey: !!apiKey, secretKey: !!secretKey, voice });
 
         if (!apiKey || !secretKey) {
             throw new Error('未配置百度语音API密钥');
         }
 
+        // 停止当前播放
+        if (currentUtterance) {
+            stopSpeaking();
+        }
+
+        button.classList.add('loading');
+        button.setAttribute('title', '正在创建合成任务...');
+
+        // 获取访问令牌
         const token = await getBaiduToken(apiKey, secretKey);
+        if (!token) {
+            throw new Error('获取访问令牌失败');
+        }
 
-        const url = new URL('./index.php', window.location.href);
-        url.searchParams.set('c', 'TextToSpeech');
-        url.searchParams.set('a', 'baiduSynthesize');
+        // 创建合成任务
+        const createTaskUrl = new URL('./index.php', window.location.href);
+        createTaskUrl.searchParams.set('c', 'TextToSpeech');
+        createTaskUrl.searchParams.set('a', 'createTask');
 
-        const formData = new FormData();
-        formData.append('text', text);
-        formData.append('token', token);
-        formData.append('lang', lang);
-        formData.append('_csrf', window.context.csrf);  // 添加CSRF令牌
+        const createTaskData = new FormData();
+        createTaskData.append('text', text);
+        createTaskData.append('token', token);
+        createTaskData.append('voice', voice);
+        createTaskData.append('_csrf', window.context.csrf);
 
-        log('请求语音合成, URL:', url.toString());
-        const response = await fetch(url.toString(), {
+        log('创建合成任务, URL:', createTaskUrl.toString());
+
+        const createResponse = await fetch(createTaskUrl.toString(), {
             method: 'POST',
-            body: formData
+            body: createTaskData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            log('语音合成失败:', errorText);
-            throw new Error(errorText);
+        if (!createResponse.ok) {
+            const errorText = await createResponse.text();
+            log('创建任务失败:', errorText);
+            throw new Error('创建任务失败: ' + errorText);
         }
 
-        const blob = await response.blob();
-        if (blob.size === 0) {
-            throw new Error('返回的音频数据为空');
+        const createResult = await createResponse.json();
+        if (createResult.error) {
+            throw new Error(createResult.error);
+        }
+        if (!createResult.task_id) {
+            throw new Error('未获取到任务ID');
         }
 
-        log('成功获取音频数据，大小:', blob.size, 'bytes');
-        const audio = new Audio(URL.createObjectURL(blob));
-        audio.preload = 'auto';
+        const taskId = createResult.task_id;
+        log('获取到任务ID:', taskId);
+        button.setAttribute('title', '正在合成音频...');
 
-        // Set up event handlers before setting the source
-        audio.onloadedmetadata = () => {
-            log('音频时长:', audio.duration, '秒');
-        };
+        // 轮询任务状态
+        let retryCount = 0;
+        const maxRetries = 30; // 最多等待30次，每次3秒
 
-        audio.ontimeupdate = () => {
-            log('当前播放时间:', audio.currentTime, '秒');
-        };
+        while (retryCount < maxRetries) {
+            const queryTaskUrl = new URL('./index.php', window.location.href);
+            queryTaskUrl.searchParams.set('c', 'TextToSpeech');
+            queryTaskUrl.searchParams.set('a', 'queryTask');
 
-        audio.oncanplaythrough = async () => {
-            log('音频已加载，开始播放');
-            button.classList.add('playing');
-            try {
-                await audio.play();
-            } catch (error) {
-                log('播放失败:', error);
-                button.classList.remove('playing');
-                URL.revokeObjectURL(blob);
-                currentUtterance = null;
+            const queryTaskData = new FormData();
+            queryTaskData.append('token', token);
+            queryTaskData.append('task_ids', taskId);
+            queryTaskData.append('_csrf', window.context.csrf);
+
+            log('查询任务状态, task_ids:', taskId);
+            const queryResponse = await fetch(queryTaskUrl.toString(), {
+                method: 'POST',
+                body: queryTaskData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!queryResponse.ok) {
+                const errorText = await queryResponse.text();
+                log('查询任务失败:', errorText);
+                throw new Error('查询任务失败: ' + errorText);
             }
-        };
 
-        audio.onended = () => {
-            const playbackTime = audio.currentTime;
-            log(`百度TTS播放完成，播放时长: ${playbackTime} 秒`);
-            button.classList.remove('playing');
-            URL.revokeObjectURL(blob);
-            currentUtterance = null;
-        };
+            const queryResult = await queryResponse.json();
+            if (queryResult.error) {
+                throw new Error(queryResult.error);
+            }
+            if (!queryResult.tasks_info) {
+                throw new Error('响应中没有任务信息');
+            }
 
-        audio.onerror = (e) => {
-            const error = e.target.error;
-            log('百度TTS播放失败:', error ? error.message : '未知错误');
-            button.classList.remove('playing');
-            URL.revokeObjectURL(blob);
-            currentUtterance = null;
-        };
+            const taskInfo = queryResult.tasks_info[0];
 
-        log('加载音频...');
-        audio.src = URL.createObjectURL(blob);
-        currentUtterance = audio;
+            if (!taskInfo) {
+                throw new Error('未找到任务信息');
+            }
+
+            log('任务状态:', taskInfo.task_status);
+
+            if (taskInfo.task_status === 'Success') {
+                const audioUrl = taskInfo.task_result?.speech_url;
+                if (!audioUrl) {
+                    throw new Error('未找到音频URL');
+                }
+
+                // 创建音频对象并播放
+                const audio = new Audio();
+                audio.preload = 'auto';
+
+                audio.onloadedmetadata = () => {
+                    log('音频时长:', audio.duration, '秒');
+                };
+
+                audio.oncanplaythrough = async () => {
+                    log('音频已加载，开始播放');
+                    button.classList.remove('loading');
+                    button.classList.add('playing');
+                    try {
+                        await audio.play();
+                    } catch (error) {
+                        log('播放失败:', error);
+                        button.classList.remove('playing');
+                        currentUtterance = null;
+                    }
+                };
+
+                audio.onended = () => {
+                    log('播放完成');
+                    button.classList.remove('playing');
+                    currentUtterance = null;
+                    button.setAttribute('title', '朗读文本');
+                };
+
+                audio.onerror = (e) => {
+                    const error = e.target.error;
+                    log('播放错误:', error ? error.message : '未知错误');
+                    button.classList.remove('loading', 'playing');
+                    currentUtterance = null;
+                    button.setAttribute('title', '朗读文本');
+                };
+
+                audio.src = audioUrl;
+                currentUtterance = audio;
+                return;
+            } else if (taskInfo.task_status === 'Failed') {
+                throw new Error('合成任务失败: ' + (taskInfo.task_result?.err_msg || '未知错误'));
+            }
+
+            // 等待3秒后重试
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            retryCount++;
+            button.setAttribute('title', `正在合成音频...${retryCount}/${maxRetries}`);
+        }
+
+        throw new Error('合成超时');
+
     } catch (error) {
         log('百度TTS错误:', error);
-        button.classList.remove('playing');
-        alert(error.message);
+        button.classList.remove('loading', 'playing');
+        button.setAttribute('title', '朗读文本');
+        alert('语音合成失败: ' + error.message);
     }
 }
 
