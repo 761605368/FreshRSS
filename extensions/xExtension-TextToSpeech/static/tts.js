@@ -126,21 +126,15 @@ async function handleTTSButtonClick(button, element) {
 
         // 获取文章内容
         let text;
-        const article = element.closest('article');
-        if (!article) {
-            log('找不到文章元素');
+		const fluxElement = element.closest('.flux');
+        if (!fluxElement) {
+            log('找不到文章');
             return;
         }
 
-        // 如果是标题按钮，获取标题文本
-        if (button.closest('.title')) {
-            const titleElement = article.querySelector('h1');
-            text = titleElement ? titleElement.textContent.trim() : '';
-        } else {
-            // 如果是内容按钮，获取文章主体内容
-            const contentElement = article.querySelector('.content');
-            text = contentElement ? contentElement.textContent.trim() : '';
-        }
+		const contentElement = fluxElement.querySelector('.content');
+		text = contentElement ? contentElement.textContent.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5，。！；：、？]+/g, '')
+			.replace(/\s+/g, ' ')	: '';
 
         if (!text) {
             log('内容为空');
@@ -148,6 +142,7 @@ async function handleTTSButtonClick(button, element) {
         }
 
         log('文本长度:', text.length);
+        log('文本:', text);
         await startSpeaking(text, button);
     } catch (error) {
         log('TTS处理错误:', error);
@@ -215,11 +210,12 @@ function speakBrowser(text, button) {
     speechSynthesis.speak(utterance);
 }
 
-// 使用百度语音合成
+// 百度语音合成
 async function speakBaidu(text, button) {
     try {
         const apiKey = button.getAttribute('data-tts-api-key');
         const secretKey = button.getAttribute('data-tts-secret-key');
+        const lang = button.getAttribute('data-tts-lang');
 
         log('API配置:', { apiKey: !!apiKey, secretKey: !!secretKey });
 
@@ -232,37 +228,32 @@ async function speakBaidu(text, button) {
         const url = new URL('./index.php', window.location.href);
         url.searchParams.set('c', 'TextToSpeech');
         url.searchParams.set('a', 'baiduSynthesize');
-        url.searchParams.set('token', token);
-        url.searchParams.set('text', text);
+
+        const formData = new FormData();
+        formData.append('text', text);
+        formData.append('token', token);
+        formData.append('lang', lang);
+        formData.append('_csrf', window.context.csrf);  // 添加CSRF令牌
 
         log('请求语音合成, URL:', url.toString());
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), {
+            method: 'POST',
+            body: formData
+        });
 
         if (!response.ok) {
             const errorText = await response.text();
             log('语音合成失败:', errorText);
-            throw new Error(`语音合成失败: ${response.status} - ${errorText}`);
+            throw new Error(errorText);
         }
 
-        const contentType = response.headers.get('content-type');
-        log('响应内容类型:', contentType);
-
-        if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            log('语音合成返回错误:', errorData);
-            throw new Error(errorData.error || '语音合成失败');
+        const blob = await response.blob();
+        if (blob.size === 0) {
+            throw new Error('返回的音频数据为空');
         }
 
-        const audioBlob = await response.blob();
-        log('获取到音频数据，大小:', audioBlob.size, '字节');
-
-        if (audioBlob.size === 0) {
-            throw new Error('获取到的音频数据为空');
-        }
-
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio();
-
+        log('成功获取音频数据，大小:', blob.size, 'bytes');
+        const audio = new Audio(URL.createObjectURL(blob));
         audio.preload = 'auto';
 
         // Set up event handlers before setting the source
@@ -271,19 +262,18 @@ async function speakBaidu(text, button) {
         };
 
         audio.ontimeupdate = () => {
-            // log('当前播放时间:', audio.currentTime, '秒');
+            log('当前播放时间:', audio.currentTime, '秒');
         };
 
         audio.oncanplaythrough = async () => {
+            log('音频已加载，开始播放');
+            button.classList.add('playing');
             try {
-                currentUtterance = audio;
-                button.classList.add('playing');
-                log('音频加载完成，开始播放...');
                 await audio.play();
             } catch (error) {
-                log('播放音频失败:', error);
+                log('播放失败:', error);
                 button.classList.remove('playing');
-                URL.revokeObjectURL(audioUrl);
+                URL.revokeObjectURL(blob);
                 currentUtterance = null;
             }
         };
@@ -292,7 +282,7 @@ async function speakBaidu(text, button) {
             const playbackTime = audio.currentTime;
             log(`百度TTS播放完成，播放时长: ${playbackTime} 秒`);
             button.classList.remove('playing');
-            URL.revokeObjectURL(audioUrl);
+            URL.revokeObjectURL(blob);
             currentUtterance = null;
         };
 
@@ -300,16 +290,17 @@ async function speakBaidu(text, button) {
             const error = e.target.error;
             log('百度TTS播放失败:', error ? error.message : '未知错误');
             button.classList.remove('playing');
-            URL.revokeObjectURL(audioUrl);
+            URL.revokeObjectURL(blob);
             currentUtterance = null;
         };
 
         log('加载音频...');
-        audio.src = audioUrl;
+        audio.src = URL.createObjectURL(blob);
+        currentUtterance = audio;
     } catch (error) {
-        log('百度语音合成错误:', error);
+        log('百度TTS错误:', error);
         button.classList.remove('playing');
-        throw error;
+        alert(error.message);
     }
 }
 
@@ -319,19 +310,35 @@ async function getBaiduToken(apiKey, secretKey) {
         const url = new URL('./index.php', window.location.href);
         url.searchParams.set('c', 'TextToSpeech');
         url.searchParams.set('a', 'baiduToken');
-        url.searchParams.set('api_key', apiKey);
-        url.searchParams.set('secret_key', secretKey);
+
+        const formData = new FormData();
+        formData.append('api_key', apiKey);
+        formData.append('secret_key', secretKey);
+        formData.append('_csrf', window.context.csrf);  // 添加CSRF令牌
 
         log('请求百度访问令牌, URL:', url.toString());
-        const response = await fetch(url.toString());
+        log('API Key:', apiKey.substring(0, 4) + '...');
+
+        const response = await fetch(url.toString(), {
+            method: 'POST',
+            body: formData
+        });
+
+        const responseText = await response.text();
+        log('原始响应:', responseText);
 
         if (!response.ok) {
-            const errorText = await response.text();
-            log('获取令牌失败:', errorText);
-            throw new Error(`获取令牌失败: ${response.status} - ${errorText}`);
+            throw new Error(`HTTP错误: ${response.status} - ${responseText}`);
         }
 
-        const data = await response.json();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            log('解析JSON失败:', e);
+            throw new Error('服务器响应格式错误: ' + responseText);
+        }
+
         log('获取令牌响应:', JSON.stringify(data, null, 2));
 
         if (data.error) {
@@ -346,7 +353,7 @@ async function getBaiduToken(apiKey, secretKey) {
         return data.access_token;
     } catch (error) {
         log('获取百度访问令牌失败:', error);
-        throw error;
+        throw new Error('获取访问令牌失败: ' + error.message);
     }
 }
 

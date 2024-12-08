@@ -11,7 +11,7 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
 
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
-  
+
   <div id="tts-config">
     <label for="tts_service">语音服务</label>
     <select name="tts_service" id="tts_service">
@@ -19,10 +19,10 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
       <option value="baidu" <?php echo ($tts_service == 'baidu' ? 'selected' : ''); ?>>百度语音</option>
     </select>
 
-    <div id="api_settings" class="<?php echo $tts_service === 'browser' ? 'hidden' : ''; ?>">
+    <div id="api_settings"">
       <label for="tts_api_key">API Key</label>
       <input type="password" name="tts_api_key" id="tts_api_key" value="<?php echo $tts_api_key; ?>">
-      
+
       <label for="tts_secret_key">Secret Key</label>
       <input type="password" name="tts_secret_key" id="tts_secret_key" value="<?php echo $tts_secret_key; ?>">
     </div>
@@ -47,49 +47,3 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
   <hr />
   <button type="submit">保存</button>
 </form>
-
-<style>
-#tts-config {
-  margin: 1em 0;
-}
-
-#tts-config label {
-  display: block;
-  margin-top: 1em;
-  margin-bottom: 0.5em;
-  font-weight: bold;
-}
-
-#tts-config input[type="number"],
-#tts-config select {
-  width: 200px;
-  padding: 0.5em;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-#tts-config input[type="number"] {
-  -moz-appearance: textfield;
-}
-
-#tts-config input[type="number"]::-webkit-outer-spin-button,
-#tts-config input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.hidden {
-  display: none;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const serviceSelect = document.getElementById('tts_service');
-    const apiSettings = document.getElementById('api_settings');
-    
-    serviceSelect.addEventListener('change', function() {
-        apiSettings.classList.toggle('hidden', this.value === 'browser');
-    });
-});
-</script>
