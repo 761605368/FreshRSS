@@ -119,21 +119,34 @@ function createTTSButton() {
 // 处理TTS按钮点击
 async function handleTTSButtonClick(button, element) {
     try {
-        if (button.classList.contains('playing')) {
+        // Check if audio is currently playing
+        if (currentUtterance instanceof Audio) {
+            if (currentUtterance.paused) {
+                // Resume playback
+                await currentUtterance.play();
+                button.classList.add('playing');
+                return;
+            } else {
+                // Pause playback
+                currentUtterance.pause();
+                button.classList.remove('playing');
+                return;
+            }
+        } else if (button.classList.contains('playing')) {
             stopSpeaking();
             return;
         }
 
         // 获取文章内容
         let text;
-		const fluxElement = element.closest('.flux');
+        const fluxElement = element.closest('.flux');
         if (!fluxElement) {
             log('找不到文章');
             return;
         }
 
-		const contentElement = fluxElement.querySelector('.content');
-		text = contentElement ? contentElement.textContent.trim()	: '';
+        const contentElement = fluxElement.querySelector('.content');
+        text = contentElement ? contentElement.textContent.trim() : '';
 
         if (!text) {
             log('内容为空');
@@ -342,8 +355,9 @@ async function speakBaidu(text, button) {
                         await audio.play();
                     } catch (error) {
                         log('播放失败:', error);
-                        button.classList.remove('playing');
+                        button.classList.remove('playing', 'loading');
                         currentUtterance = null;
+                        button.setAttribute('title', '播放失败: ' + error.message);
                     }
                 };
 
@@ -354,12 +368,26 @@ async function speakBaidu(text, button) {
                     button.setAttribute('title', '朗读文本');
                 };
 
+                audio.onpause = () => {
+                    if (!audio.ended) {
+                        log('音频已暂停');
+                        button.classList.remove('playing');
+                        button.setAttribute('title', '继续播放');
+                    }
+                };
+
+                audio.onplay = () => {
+                    log('音频开始/继续播放');
+                    button.classList.add('playing');
+                    button.setAttribute('title', '点击暂停');
+                };
+
                 audio.onerror = (e) => {
                     const error = e.target.error;
                     log('播放错误:', error ? error.message : '未知错误');
                     button.classList.remove('loading', 'playing');
                     currentUtterance = null;
-                    button.setAttribute('title', '朗读文本');
+                    button.setAttribute('title', '播放失败: ' + (error ? error.message : '未知错误'));
                 };
 
                 audio.src = audioUrl;
