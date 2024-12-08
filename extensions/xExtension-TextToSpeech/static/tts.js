@@ -6,6 +6,7 @@ function log(...args) {
 // 当前播放的音频
 let currentUtterance = null;
 let currentAudio = null;  // 添加全局变量来存储当前音频对象
+let currentButton = null;  // 添加全局变量来存储当前播放按钮
 let speechSynthesis = window.speechSynthesis;
 
 // 缓存数据库
@@ -158,44 +159,52 @@ async function initTTS() {
     const config = getConfig();
     log('TTS配置:', config);
 
-    // 获取所有按钮占位符
+    // 初始化TTS按钮
+    initTTSButtons();
+}
+
+// 初始化TTS按钮
+function initTTSButtons() {
+    log('Starting TTS initialization');
+    const config = getConfig();
+    if (!config) {
+        log('无法获取TTS配置');
+        return;
+    }
+    log('TTS配置:', config);
+
+    // 处理标题占位符
     const titlePlaceholders = document.querySelectorAll('.tts-button-placeholder.title');
-    const contentPlaceholders = document.querySelectorAll('.tts-button-placeholder.content');
-
     log('找到标题占位符:', titlePlaceholders.length);
-    log('找到内容占位符:', contentPlaceholders.length);
 
-    // 为标题添加TTS按钮
     titlePlaceholders.forEach(placeholder => {
-        const titleElement = placeholder.nextElementSibling;
+        const titleElement = placeholder.closest('.flux').querySelector('.title a');
         if (titleElement) {
-            log('Adding button to title:', titleElement.textContent);
-            const titleButton = createTTSButton();
+            const titleButton = document.createElement('button');
+            titleButton.className = 'tts-button';
+            titleButton.dataset.text = titleElement.textContent.trim();
             setButtonAttributes(titleButton, config);
             placeholder.replaceWith(titleButton);
 
-            titleButton.addEventListener('click', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleTTSButtonClick(titleButton, titleElement);
-            });
+            titleButton.addEventListener('click', handleTTSButtonClick);
         }
     });
 
-    // 为内容添加TTS按钮
+    // 处理内容占位符
+    const contentPlaceholders = document.querySelectorAll('.tts-button-placeholder.content');
+    log('找到内容占位符:', contentPlaceholders.length);
+
     contentPlaceholders.forEach(placeholder => {
-        const contentElement = placeholder.nextElementSibling;
+        const contentElement = placeholder.closest('.flux').querySelector('.content');
+        log('Adding button to content');
         if (contentElement) {
-            log('Adding button to content');
-            const contentButton = createTTSButton();
+            const contentButton = document.createElement('button');
+            contentButton.className = 'tts-button';
+            contentButton.dataset.text = contentElement.textContent.trim();
             setButtonAttributes(contentButton, config);
             placeholder.replaceWith(contentButton);
 
-            contentButton.addEventListener('click', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleTTSButtonClick(contentButton, contentElement);
-            });
+            contentButton.addEventListener('click', handleTTSButtonClick);
         }
     });
 
@@ -204,288 +213,162 @@ async function initTTS() {
 
 // 设置按钮属性
 function setButtonAttributes(button, config) {
-    // 设置TTS服务
-    button.setAttribute('data-tts-service', config.service || 'browser');
-
-    // 如果是百度服务，设置API密钥
-    if (config.service === 'baidu' && config.baiduApiKey && config.baiduSecretKey) {
-        button.setAttribute('data-tts-api-key', config.baiduApiKey);
-        button.setAttribute('data-tts-secret-key', config.baiduSecretKey);
-    }
-
-    // 设置语音参数
-    button.setAttribute('data-tts-lang', config.lang || 'zh-CN');
-    button.setAttribute('data-tts-rate', config.rate || '1');
-    button.setAttribute('data-tts-pitch', config.pitch || '1');
-    button.setAttribute('data-tts-volume', config.volume || '1');
-}
-
-// 创建TTS按钮
-function createTTSButton() {
-    const button = document.createElement('button');
-    button.className = 'tts-button';
-    button.setAttribute('title', 'Text to Speech');
+    button.setAttribute('title', '朗读文本');
     button.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
         </svg>`;
-    return button;
+    
+    // 设置TTS配置属性
+    button.setAttribute('data-tts-rate', config.rate || '1');
+    button.setAttribute('data-tts-pitch', config.pitch || '1');
+    button.setAttribute('data-tts-volume', config.volume || '1');
+    button.setAttribute('data-tts-lang', config.lang || 'zh-CN');
+    button.setAttribute('data-tts-service', config.service || 'baidu');
 }
 
 // 处理TTS按钮点击
-async function handleTTSButtonClick(button, element) {
+async function handleTTSButtonClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const button = event.currentTarget;
+    log('按钮点击 - 当前状态:', currentAudio ? (currentAudio.paused ? '已暂停' : '正在播放') : '无音频');
+    
     try {
-        // 如果正在播放，则停止
-        if (button.classList.contains('playing')) {
-            stopSpeaking();
-            return;
+        // 如果当前有音频在播放或暂停
+        if (currentAudio && currentButton) {
+            // 如果点击的是当前按钮
+            if (button === currentButton) {
+                log('点击当前按钮 - 音频状态:', currentAudio.paused ? '已暂停' : '正在播放');
+                if (currentAudio.paused) {
+                    // 如果是暂停状态，恢复播放
+                    log('当前音频已暂停，尝试恢复播放');
+                    await resumeSpeaking();
+                } else {
+                    // 如果正在播放，暂停
+                    log('当前音频正在播放，尝试暂停');
+                    pauseSpeaking();
+                }
+                return;
+            } else {
+                // 如果点击的是其他按钮，停止当前播放
+                log('点击了新按钮，停止当前播放');
+                stopSpeaking();
+            }
         }
 
-        // 如果其他按钮正在播放，先停止它
-        const playingButton = document.querySelector('.tts-button.playing');
-        if (playingButton && playingButton !== button) {
-            stopSpeaking();
-        }
-
-        // 获取文章内容
-        let text;
-		const fluxElement = element.closest('.flux');
-        if (!fluxElement) {
-            log('找不到文章');
-            return;
-        }
-
-		const contentElement = fluxElement.querySelector('.content');
-		text = contentElement ? contentElement.textContent.trim()	: '';
-
+        // 只有在没有当前音频，或者点击了新按钮时才开始新的播放
+        const text = button.dataset.text;
         if (!text) {
-            log('内容为空');
-            return;
+            throw new Error('没有找到要朗读的文本');
         }
 
-        log('文本长度:', text.length);
-        log('文本:', text);
+        log('准备朗读文本:', text.substring(0, 50) + '...');
+        // 开始新的播放
+        currentButton = button;
         await startSpeaking(text, button);
+
     } catch (error) {
         log('TTS处理错误:', error);
-        alert('语音合成失败: ' + error.message);
-    }
-}
-
-// 停止当前播放
-function stopSpeaking() {
-    if (currentUtterance) {
-        speechSynthesis.cancel();
-        currentUtterance = null;
-    }
-    if (currentAudio) {
-        currentAudio.pause();
-        currentAudio.currentTime = 0;  // 重置播放位置
-        currentAudio = null;
-    }
-
-    // 重置所有播放按钮的状态
-    document.querySelectorAll('.tts-button.playing').forEach(button => {
-        button.classList.remove('playing', 'loading');
-        button.setAttribute('title', '朗读文本');
-    });
-}
-
-// 开始语音播放
-async function startSpeaking(text, button) {
-    if (currentUtterance) {
         stopSpeaking();
+        button.setAttribute('title', '朗读失败: ' + error.message);
     }
+}
 
-    const service = button.getAttribute('data-tts-service');
-    log('使用语音服务:', service);
-
-    if (service === 'baidu') {
-        await speakBaidu(text, button);
+// 暂停播放
+function pauseSpeaking() {
+    log('尝试暂停播放');
+    if (currentAudio && currentButton) {
+        if (!currentAudio.paused) {
+            currentAudio.pause();
+            currentButton.classList.remove('playing');
+            currentButton.setAttribute('title', '继续播放');
+            log('已暂停播放');
+        } else {
+            log('音频已经是暂停状态');
+        }
     } else {
-        speakBrowser(text, button);
+        log('没有可暂停的音频');
     }
 }
 
-// 使用浏览器原生语音合成
-function speakBrowser(text, button) {
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    // 设置语音参数
-    utterance.lang = button.getAttribute('data-tts-lang') || 'zh-CN';
-    utterance.rate = parseFloat(button.getAttribute('data-tts-rate')) || 1;
-    utterance.pitch = parseFloat(button.getAttribute('data-tts-pitch')) || 1;
-    utterance.volume = parseFloat(button.getAttribute('data-tts-volume')) || 1;
-
-    utterance.onend = () => {
-        button.classList.remove('playing');
-        currentUtterance = null;
-        log('浏览器TTS播放完成');
-    };
-
-    utterance.onerror = (event) => {
-        log('浏览器TTS错误:', event.error);
-        button.classList.remove('playing');
-        currentUtterance = null;
-    };
-
-    currentUtterance = utterance;
-    button.classList.add('playing');
-    speechSynthesis.speak(utterance);
+// 恢复播放
+async function resumeSpeaking() {
+    log('尝试恢复播放');
+    if (currentAudio && currentButton) {
+        if (currentAudio.paused) {
+            try {
+                await currentAudio.play();
+                currentButton.classList.add('playing');
+                currentButton.setAttribute('title', '点击暂停');
+                log('已恢复播放');
+            } catch (error) {
+                log('恢复播放失败:', error);
+                stopSpeaking();
+            }
+        } else {
+            log('音频已经在播放中');
+        }
+    } else {
+        log('没有可恢复的音频');
+    }
 }
 
-// 百度语音合成
-async function speakBaidu(text, button) {
+// 停止播放
+function stopSpeaking() {
+    log('尝试停止播放');
+    if (currentAudio) {
+        try {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;  // 重置播放位置
+            currentAudio.onloadedmetadata = null;
+            currentAudio.oncanplaythrough = null;
+            currentAudio.onended = null;
+            currentAudio.onerror = null;
+            currentAudio.onpause = null;
+            currentAudio.onplay = null;
+            currentAudio.src = '';
+            currentAudio.remove();
+            currentAudio = null;
+            log('已清理音频对象');
+        } catch (error) {
+            log('清理音频对象时出错:', error);
+        }
+    }
+
+    if (currentButton) {
+        currentButton.classList.remove('loading', 'playing');
+        currentButton.setAttribute('title', '朗读文本');
+        currentButton = null;
+        log('已重置按钮状态');
+    }
+}
+
+// 从URL播放音频
+async function playAudioFromUrl(audioUrl, button) {
     try {
-        const config = getConfig();
-        if (!config || !config.baiduApiKey || !config.baiduSecretKey) {
-            throw new Error('请先配置百度API密钥');
-        }
-
-        // 检查缓存
-        const hash = generateHash(text);
-        const cached = await getFromCache(hash);
+        const proxyUrl = createProxyUrl(audioUrl);
+        log('使用代理URL播放:', proxyUrl);
         
-        if (cached && cached.audioInfo) {
-            log('使用缓存的音频');
-            const audio = createAudioPlayer(cached.audioInfo.url);
-            currentAudio = audio;
-            setupAudioEvents(audio, button);
-            return;
-        }
-
-        button.classList.add('loading');
-        button.setAttribute('title', '正在获取访问令牌...');
-
-        // 获取访问令牌
-        const token = await getBaiduToken(config.baiduApiKey, config.baiduSecretKey);
-        if (!token) {
-            throw new Error('获取访问令牌失败');
-        }
-
-        // 如果有缓存的任务ID，直接使用
-        let taskId = cached?.taskId;
+        const audio = new Audio();
+        setupAudioEvents(audio, button);
         
-        if (!taskId) {
-            // 创建合成任务
-            button.setAttribute('title', '正在创建合成任务...');
-            
-            const createTaskUrl = new URL('./index.php', window.location.href);
-            createTaskUrl.searchParams.set('c', 'TextToSpeech');
-            createTaskUrl.searchParams.set('a', 'createTask');
-
-            const createTaskData = new FormData();
-            createTaskData.append('text', text);
-            createTaskData.append('token', token);
-            createTaskData.append('voice', config.voice || 0);
-            createTaskData.append('_csrf', window.context.csrf);
-
-            log('创建合成任务, URL:', createTaskUrl.toString());
-
-            const createResponse = await fetch(createTaskUrl.toString(), {
-                method: 'POST',
-                body: createTaskData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-
-            if (!createResponse.ok) {
-                const errorText = await createResponse.text();
-                log('创建任务失败:', errorText);
-                throw new Error('创建任务失败: ' + errorText);
-            }
-
-            const createResult = await createResponse.json();
-            if (createResult.error) {
-                throw new Error(createResult.error);
-            }
-            if (!createResult.task_id) {
-                throw new Error('未获取到任务ID');
-            }
-
-            taskId = createResult.task_id;
-            // 保存任务ID到缓存
-            await saveToCache(hash, taskId, null);
-        }
-
-        log('获取到任务ID:', taskId);
-        button.setAttribute('title', '正在合成音频...');
-
-        // 轮询任务状态
-        let retryCount = 0;
-        const maxRetries = 30; // 最多等待30次，每次3秒
-
-        while (retryCount < maxRetries) {
-            const queryTaskUrl = new URL('./index.php', window.location.href);
-            queryTaskUrl.searchParams.set('c', 'TextToSpeech');
-            queryTaskUrl.searchParams.set('a', 'queryTask');
-
-            const queryTaskData = new FormData();
-            queryTaskData.append('token', token);
-            queryTaskData.append('task_ids', taskId);
-            queryTaskData.append('_csrf', window.context.csrf);
-
-            log('查询任务状态, task_ids:', taskId);
-            const queryResponse = await fetch(queryTaskUrl.toString(), {
-                method: 'POST',
-                body: queryTaskData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-
-            if (!queryResponse.ok) {
-                const errorText = await queryResponse.text();
-                log('查询任务失败:', errorText);
-                throw new Error('查询任务失败: ' + errorText);
-            }
-
-            const queryResult = await queryResponse.json();
-            if (queryResult.error) {
-                throw new Error(queryResult.error);
-            }
-
-            const taskInfo = queryResult.tasks_info[0];
-            if (!taskInfo) {
-                throw new Error('未找到任务信息');
-            }
-
-            log('任务状态:', taskInfo.task_status);
-
-            if (taskInfo.task_status === 'Success') {
-                const audioUrl = taskInfo.task_result?.speech_url;
-                if (!audioUrl) {
-                    throw new Error('未找到音频URL');
-                }
-
-                log('获取到音频URL:', audioUrl);
-
-                // 下载并缓存音频
-                await downloadAndCacheAudio(audioUrl, hash);
-                
-                // 创建音频对象并播放
-                const audio = createAudioPlayer(audioUrl);
-                currentAudio = audio;
-                setupAudioEvents(audio, button);
-                return;
-
-            } else if (taskInfo.task_status === 'Failed') {
-                throw new Error('合成任务失败: ' + (taskInfo.task_result?.err_msg || '未知错误'));
-            }
-
-            retryCount++;
-            await new Promise(resolve => setTimeout(resolve, 3000));
-        }
-
-        throw new Error('等待任务完成超时');
-
+        // 设置音频源并开始加载
+        audio.src = proxyUrl;
+        currentAudio = audio;  // 设置当前音频
+        
+        // 等待音频加载完成
+        await new Promise((resolve, reject) => {
+            audio.addEventListener('error', reject);
+            audio.addEventListener('canplaythrough', resolve, { once: true });
+        });
+        
     } catch (error) {
-        log('语音合成错误:', error);
-        button.classList.remove('loading', 'playing');
-        button.setAttribute('title', '语音合成失败: ' + error.message);
+        log('播放音频失败:', error);
+        stopSpeaking();
         throw error;
     }
 }
@@ -494,37 +377,112 @@ async function speakBaidu(text, button) {
 function setupAudioEvents(audio, button) {
     audio.preload = 'auto';
 
+    let playStarted = false;  // 添加标志来防止重复播放
+
     audio.onloadedmetadata = () => {
-        log('音频时长:', audio.duration, '秒');
+        if (audio === currentAudio) {
+            log('音频时长:', audio.duration, '秒');
+        }
     };
 
     audio.oncanplaythrough = async () => {
-        log('音频已加载，开始播放');
-        button.classList.remove('loading');
-        button.classList.add('playing');
-        try {
-            await audio.play();
-        } catch (error) {
-            log('播放失败:', error, '音频URL:', audio.src);
-            button.classList.remove('playing');
-            currentAudio = null;
+        if (!playStarted && audio === currentAudio) {  // 只有当这个audio是当前的audio时才播放
+            log('音频已加载，开始播放');
+            button.classList.remove('loading');
+            button.classList.add('playing');
+            button.setAttribute('title', '点击暂停');
+            playStarted = true;
+            try {
+                await audio.play();
+            } catch (error) {
+                log('播放失败:', error);
+                stopSpeaking();
+            }
         }
     };
 
     audio.onended = () => {
-        log('播放完成');
-        button.classList.remove('playing');
-        currentAudio = null;
-        button.setAttribute('title', '朗读文本');
+        if (audio === currentAudio) {  // 只处理当前音频的事件
+            log('播放完成');
+            stopSpeaking();
+        }
     };
 
     audio.onerror = (e) => {
-        const error = e.target.error;
-        log('播放错误:', error ? error.message : '未知错误', '音频URL:', audio.src);
-        button.classList.remove('loading', 'playing');
-        currentAudio = null;
-        button.setAttribute('title', '朗读文本');
+        if (audio === currentAudio) {  // 只处理当前音频的事件
+            const error = e.target.error;
+            log('播放错误:', error ? error.message : '未知错误');
+            stopSpeaking();
+        }
     };
+
+    audio.onpause = () => {
+        if (audio === currentAudio && !audio.ended) {  // 只处理当前音频的非结束暂停事件
+            log('音频已暂停，当前时间:', audio.currentTime);
+            button.classList.remove('playing');
+            button.setAttribute('title', '继续播放');
+        }
+    };
+
+    audio.onplay = () => {
+        if (audio === currentAudio) {  // 只处理当前音频的事件
+            log('音频开始/继续播放，当前时间:', audio.currentTime);
+            button.classList.add('playing');
+            button.setAttribute('title', '点击暂停');
+        } else {
+            // 如果不是当前音频，立即暂停
+            log('非当前音频尝试播放，已阻止');
+            audio.pause();
+        }
+    };
+}
+
+// 开始语音播放
+async function startSpeaking(text, button) {
+    try {
+        // 确保停止之前的播放
+        stopSpeaking();
+        
+        const config = getConfig();
+        if (!config) {
+            throw new Error('无法获取TTS配置');
+        }
+
+        log('使用语音服务:', config.service);
+        
+        if (config.service === 'baidu') {
+            button.classList.add('loading');
+            currentButton = button;  // 立即设置当前按钮
+            const hash = generateHash(text);
+            
+            // 尝试从缓存获取
+            const cachedAudio = await getFromCache(hash);
+            if (cachedAudio) {
+                log('从缓存获取到音频信息, hash:', hash);
+                log('使用缓存的音频');
+                await playAudioFromUrl(cachedAudio.audioInfo.url, button);
+                return;
+            }
+
+            // 如果缓存中没有，则请求新的音频
+            const audioUrl = await requestBaiduTTS(text);
+            if (!audioUrl) {
+                throw new Error('获取音频URL失败');
+            }
+
+            // 缓存音频信息
+            await cacheAudio(hash, audioUrl);
+            
+            // 播放音频
+            await playAudioFromUrl(audioUrl, button);
+        } else {
+            throw new Error('不支持的语音服务');
+        }
+    } catch (error) {
+        log('语音合成错误:', error);
+        stopSpeaking();
+        throw error;
+    }
 }
 
 // 获取百度访问令牌
