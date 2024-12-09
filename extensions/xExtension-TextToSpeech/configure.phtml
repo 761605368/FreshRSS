@@ -7,6 +7,8 @@ $tts_lang = FreshRSS_Context::$user_conf->tts_lang ?? 'zh-CN';
 $tts_service = FreshRSS_Context::$user_conf->tts_service ?? 'browser';
 $tts_api_key = FreshRSS_Context::$user_conf->tts_api_key ?? '';
 $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
+$tts_cache_days = FreshRSS_Context::$user_conf->tts_cache_days ?? '365';
+$tts_cache_size = FreshRSS_Context::$user_conf->tts_cache_size ?? '500';
 ?>
 
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
@@ -42,6 +44,13 @@ $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
 
     <label for="tts_volume">音量 (0 - 1)</label>
     <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
+
+	<label for="tts_volume">tts_cache_days:天</label>
+	<input type="number" name="tts_cache_days" id="tts_cache_days"  step="1" value="<?php echo $tts_cache_days; ?>">
+
+	<label for="tts_volume">tts_cache_size:MB</label>
+	<input type="number" name="tts_cache_size" id="tts_cache_size"  step="1" value="<?php echo $tts_cache_size; ?>">
+
   </div>
 
   <hr />

@@ -116,8 +116,9 @@ async function saveToCache(hash, audioBlob) {
 
 // 清理旧缓存
 async function cleanOldCache() {
-    const MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
-    const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7天
+    const config = getConfig();
+    const MAX_CACHE_SIZE = (config.cacheSize || 500) * 1024 * 1024; // 默认100MB
+    const MAX_CACHE_AGE = (config.cacheDays || 365) * 24 * 60 * 60 * 1000; // 默认7天
 
     if (!db) return;
 
@@ -134,7 +135,7 @@ async function cleanOldCache() {
             const cursor = event.target.result;
             if (cursor) {
                 totalSize += cursor.value.size || 0;
-                
+
                 // 检查是否过期或总大小超限
                 if (now - cursor.value.timestamp > MAX_CACHE_AGE || totalSize > MAX_CACHE_SIZE) {
                     itemsToDelete.push(cursor.value.hash);
@@ -147,6 +148,10 @@ async function cleanOldCache() {
                 });
                 if (itemsToDelete.length > 0) {
                     log('清理了', itemsToDelete.length, '个缓存项');
+                    log('缓存配置: ', {
+                        最大缓存天数: config.cacheDays,
+                        最大缓存大小: config.cacheSize + 'MB'
+                    });
                 }
                 resolve();
             }
@@ -274,7 +279,7 @@ async function handleTTSButtonClick(button, element) {
         // Check if audio is currently playing
         if (currentUtterance instanceof Audio) {
             const currentButton = document.querySelector('.tts-button.playing');
-            
+
             // If clicking the same button that's currently playing
             if (currentButton === button) {
                 if (currentUtterance.paused) {
@@ -350,10 +355,10 @@ function stopSpeaking() {
 // 开始语音播放
 async function startSpeaking(text, button) {
     log('开始语音播放');
-    
+
     // 确保停止之前的播放
     stopSpeaking();
-    
+
     const service = button.getAttribute('data-tts-service');
     log('使用语音服务:', service);
 
@@ -406,7 +411,7 @@ async function speakBaidu(text, button) {
 
         // 生成文本的哈希值
         const hash = generateHash(text);
-        
+
         // 尝试从缓存获取
         const cachedAudio = await getFromCache(hash);
         if (cachedAudio) {
