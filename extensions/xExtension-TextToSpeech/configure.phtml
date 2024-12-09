@@ -15,52 +15,72 @@ $tts_voice = FreshRSS_Context::$user_conf->tts_voice ?? '5118';
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
   <input type="hidden" name="_csrf" value="<?php echo FreshRSS_Auth::csrfToken(); ?>" />
 
-  <div id="tts-config">
-    <label for="tts_service">语音服务</label>
-    <select name="tts_service" id="tts_service">
-      <option value="browser" <?php echo ($tts_service == 'browser' ? 'selected' : ''); ?>>浏览器原生</option>
-      <option value="baidu" <?php echo ($tts_service == 'baidu' ? 'selected' : ''); ?>>百度语音</option>
-    </select>
+  <div class="form-group">
+    <legend>语音服务设置</legend>
 
-    <div id="api_settings"">
+    <div class="group-controls">
+      <label for="tts_service">语音服务</label>
+      <select name="tts_service" id="tts_service">
+        <option value="browser" <?php echo ($tts_service == 'browser' ? 'selected' : ''); ?>>浏览器原生</option>
+        <option value="baidu" <?php echo ($tts_service == 'baidu' ? 'selected' : ''); ?>>百度语音</option>
+      </select>
+    </div>
+
+    <div id="api_settings" class="group-controls">
       <label for="tts_api_key">API Key</label>
       <input type="password" name="tts_api_key" id="tts_api_key" value="<?php echo $tts_api_key; ?>">
 
       <label for="tts_secret_key">Secret Key</label>
       <input type="password" name="tts_secret_key" id="tts_secret_key" value="<?php echo $tts_secret_key; ?>">
-    </div>
 
-    <label for="tts_lang">语言</label>
-    <select name="tts_lang" id="tts_lang">
-      <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>中文（简体）</option>
-      <option value="en-US" <?php echo ($tts_lang == 'en-US' ? 'selected' : ''); ?>>英语（美国）</option>
-      <option value="ja-JP" <?php echo ($tts_lang == 'ja-JP' ? 'selected' : ''); ?>>日语</option>
-    </select>
-
-    <label for="tts_rate">语速 (0.1 - 10)</label>
-    <input type="number" name="tts_rate" id="tts_rate" min="0.1" max="10" step="0.1" value="<?php echo $tts_rate; ?>">
-
-    <label for="tts_pitch">音调 (0 - 2)</label>
-    <input type="number" name="tts_pitch" id="tts_pitch" min="0" max="2" step="0.1" value="<?php echo $tts_pitch; ?>">
-
-    <label for="tts_volume">音量 (0 - 1)</label>
-    <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
-
-	<label for="tts_voice" title="基础音库：度小宇=1，度小美=0，度逍遥（基础）=3，度丫丫=4。
+      <label for="tts_voice" title="基础音库：度小宇=1，度小美=0，度逍遥（基础）=3，度丫丫=4。
 
 精品音库：度逍遥（精品）=5003，度小鹿=5118，度博文=106，度小童=110，度小萌=111，度米朵=103，度小娇=5。默认为度小美
 
-臻品音库：度逍遥（臻品）=4003，度博文=4106，度小贤=4115，度小鹿=4119，度灵儿=4105，度小乔=4117，度小雯=4100，度米朵=4103，度姗姗=4144，度小贝=4278，度清风=4143，度小新=4140，度小彦=4129，度星河=4149，度小清=4254，度博文=4206，南方=4226。">音库</label>
-	<input type="number" name="tts_voice" id="tts_voice"  value="<?php echo $tts_voice; ?>">
-
-	<label for="tts_volume">tts_cache_days:天</label>
-	<input type="number" name="tts_cache_days" id="tts_cache_days"  step="1" value="<?php echo $tts_cache_days; ?>">
-
-	<label for="tts_volume">tts_cache_size:MB</label>
-	<input type="number" name="tts_cache_size" id="tts_cache_size"  step="1" value="<?php echo $tts_cache_size; ?>">
-
+臻品音库：度逍遥（臻品）=4003，度博文=4106，度小贤=4115，度小鹿=4119，度灵儿=4105，度小乔=4117，度小雯=4100，度米朵=4103，度姗姗=4144，度小贝=4278，度清风=4143，度小新=4140，度小彦=4129，度星河=4149，度小清=4254，度博文=4206，南方=4226。">语音发音人</label>
+      <input type="number" name="tts_voice" id="tts_voice" value="<?php echo $tts_voice; ?>">
+    </div>
   </div>
 
-  <hr />
-  <button type="submit">保存</button>
+  <div class="form-group">
+    <legend>语音参数设置</legend>
+
+    <div class="group-controls">
+      <label for="tts_lang">语言</label>
+      <select name="tts_lang" id="tts_lang">
+        <option value="zh-CN" <?php echo ($tts_lang == 'zh-CN' ? 'selected' : ''); ?>>中文（简体）</option>
+        <option value="en-US" <?php echo ($tts_lang == 'en-US' ? 'selected' : ''); ?>>英语（美国）</option>
+        <option value="ja-JP" <?php echo ($tts_lang == 'ja-JP' ? 'selected' : ''); ?>>日语</option>
+      </select>
+
+      <label for="tts_rate">语速 (0.1 - 10)</label>
+      <input type="number" name="tts_rate" id="tts_rate" min="0.1" max="10" step="0.1" value="<?php echo $tts_rate; ?>">
+
+      <label for="tts_pitch">音调 (0 - 2)</label>
+      <input type="number" name="tts_pitch" id="tts_pitch" min="0" max="2" step="0.1" value="<?php echo $tts_pitch; ?>">
+
+      <label for="tts_volume">音量 (0 - 1)</label>
+      <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <legend>缓存设置</legend>
+
+    <div class="group-controls">
+      <label for="tts_cache_days">缓存保留天数</label>
+      <input type="number" name="tts_cache_days" id="tts_cache_days" min="1" value="<?php echo $tts_cache_days; ?>">
+      <p class="help">音频缓存保留的天数，默认365天</p>
+
+      <label for="tts_cache_size">缓存大小限制(MB)</label>
+      <input type="number" name="tts_cache_size" id="tts_cache_size" min="1" value="<?php echo $tts_cache_size; ?>">
+      <p class="help">缓存大小上限，单位MB，默认500MB</p>
+    </div>
+  </div>
+
+  <div class="form-group form-actions">
+    <div class="group-controls">
+      <button type="submit" class="btn btn-important"><?php echo _t('gen.action.submit'); ?></button>
+    </div>
+  </div>
 </form>

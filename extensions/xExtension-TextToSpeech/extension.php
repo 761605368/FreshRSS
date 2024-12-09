@@ -30,6 +30,7 @@ class TextToSpeechExtension extends Minz_Extension {
             FreshRSS_Context::$user_conf->tts_service = Minz_Request::param('tts_service', 'browser');
             FreshRSS_Context::$user_conf->tts_api_key = Minz_Request::param('tts_api_key', '');
             FreshRSS_Context::$user_conf->tts_secret_key = Minz_Request::param('tts_secret_key', '');
+            FreshRSS_Context::$user_conf->tts_voice = Minz_Request::param('tts_voice', '5118');
             // 添加缓存配置
             FreshRSS_Context::$user_conf->tts_cache_days = Minz_Request::param('tts_cache_days', 365);
             FreshRSS_Context::$user_conf->tts_cache_size = Minz_Request::param('tts_cache_size', 500);
@@ -47,10 +48,10 @@ class TextToSpeechExtension extends Minz_Extension {
         $tts_service = FreshRSS_Context::$user_conf->tts_service ?? 'browser';
         $tts_api_key = FreshRSS_Context::$user_conf->tts_api_key ?? '';
         $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
+        $tts_voice = FreshRSS_Context::$user_conf->tts_voice ?? '5118';
         // 添加缓存配置
         $tts_cache_days = FreshRSS_Context::$user_conf->tts_cache_days ?? 365;
         $tts_cache_size = FreshRSS_Context::$user_conf->tts_cache_size ?? 500;
-        $tts_voice = FreshRSS_Context::$user_conf->tts_voice ?? 5118;
 
         // 创建配置 JavaScript 对象
         $config = array(
@@ -61,10 +62,10 @@ class TextToSpeechExtension extends Minz_Extension {
             'service' => strval($tts_service),
             'baiduApiKey' => strval($tts_api_key),
             'baiduSecretKey' => strval($tts_secret_key),
+            'voice' => intval($tts_voice),
             // 添加缓存配置
             'cacheDays' => intval($tts_cache_days),
-            'cacheSize' => intval($tts_cache_size),
-			'voice' => intval($tts_voice)
+            'cacheSize' => intval($tts_cache_size)
         );
 
         // 将配置写入页面，确保 JSON 格式正确
@@ -85,11 +86,25 @@ class TextToSpeechExtension extends Minz_Extension {
     }
 
     public function amendCsp(array &$csp): void {
-        // Add blob: to media-src directive
-        if (isset($csp['media-src'])) {
-            $csp['media-src'] .= " blob:";
+        // 添加百度语音服务所需的CSP规则
+        if (isset($csp['default-src'])) {
+            $csp['default-src'] .= " *.bcebos.com";
         } else {
-            $csp['media-src'] = "'self' blob:";
+            $csp['default-src'] = "'self' *.bcebos.com";
+        }
+
+        // 添加media-src规则
+        if (isset($csp['media-src'])) {
+            $csp['media-src'] .= " 'self' blob: *.bcebos.com";
+        } else {
+            $csp['media-src'] = "'self' blob: *.bcebos.com";
+        }
+
+        // 添加connect-src规则
+        if (isset($csp['connect-src'])) {
+            $csp['connect-src'] .= " 'self' *.bcebos.com";
+        } else {
+            $csp['connect-src'] = "'self' *.bcebos.com";
         }
     }
 }
