@@ -250,6 +250,7 @@ function setButtonAttributes(button, config) {
     if (config.service === 'baidu' && config.baiduApiKey && config.baiduSecretKey) {
         button.setAttribute('data-tts-api-key', config.baiduApiKey);
         button.setAttribute('data-tts-secret-key', config.baiduSecretKey);
+        button.setAttribute('data-tts-voice', config.voice);
     }
 
     // 设置语音参数
@@ -401,7 +402,7 @@ async function speakBaidu(text, button) {
     try {
         const apiKey = button.getAttribute('data-tts-api-key');
         const secretKey = button.getAttribute('data-tts-secret-key');
-        const voice = parseInt(button.getAttribute('data-tts-voice') || '0');
+        const voice = parseInt(button.getAttribute('data-tts-voice') || '5118');
 
         log('API配置:', { apiKey: !!apiKey, secretKey: !!secretKey, voice });
 

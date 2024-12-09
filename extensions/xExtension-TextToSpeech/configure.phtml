@@ -9,6 +9,7 @@ $tts_api_key = FreshRSS_Context::$user_conf->tts_api_key ?? '';
 $tts_secret_key = FreshRSS_Context::$user_conf->tts_secret_key ?? '';
 $tts_cache_days = FreshRSS_Context::$user_conf->tts_cache_days ?? '365';
 $tts_cache_size = FreshRSS_Context::$user_conf->tts_cache_size ?? '500';
+$tts_voice = FreshRSS_Context::$user_conf->tts_voice ?? '5118';
 ?>
 
 <form action="<?php echo _url('extension', 'configure', 'e', urlencode($this->getName())); ?>" method="post">
@@ -44,6 +45,13 @@ $tts_cache_size = FreshRSS_Context::$user_conf->tts_cache_size ?? '500';
 
     <label for="tts_volume">音量 (0 - 1)</label>
     <input type="number" name="tts_volume" id="tts_volume" min="0" max="1" step="0.1" value="<?php echo $tts_volume; ?>">
+
+	<label for="tts_voice" title="基础音库：度小宇=1，度小美=0，度逍遥（基础）=3，度丫丫=4。
+
+精品音库：度逍遥（精品）=5003，度小鹿=5118，度博文=106，度小童=110，度小萌=111，度米朵=103，度小娇=5。默认为度小美
+
+臻品音库：度逍遥（臻品）=4003，度博文=4106，度小贤=4115，度小鹿=4119，度灵儿=4105，度小乔=4117，度小雯=4100，度米朵=4103，度姗姗=4144，度小贝=4278，度清风=4143，度小新=4140，度小彦=4129，度星河=4149，度小清=4254，度博文=4206，南方=4226。">音库</label>
+	<input type="number" name="tts_voice" id="tts_voice"  value="<?php echo $tts_voice; ?>">
 
 	<label for="tts_volume">tts_cache_days:天</label>
 	<input type="number" name="tts_cache_days" id="tts_cache_days"  step="1" value="<?php echo $tts_cache_days; ?>">

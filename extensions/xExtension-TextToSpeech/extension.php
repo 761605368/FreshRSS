@@ -50,6 +50,7 @@ class TextToSpeechExtension extends Minz_Extension {
         // 添加缓存配置
         $tts_cache_days = FreshRSS_Context::$user_conf->tts_cache_days ?? 365;
         $tts_cache_size = FreshRSS_Context::$user_conf->tts_cache_size ?? 500;
+        $tts_voice = FreshRSS_Context::$user_conf->tts_voice ?? 5118;
 
         // 创建配置 JavaScript 对象
         $config = array(
@@ -62,7 +63,8 @@ class TextToSpeechExtension extends Minz_Extension {
             'baiduSecretKey' => strval($tts_secret_key),
             // 添加缓存配置
             'cacheDays' => intval($tts_cache_days),
-            'cacheSize' => intval($tts_cache_size)
+            'cacheSize' => intval($tts_cache_size),
+			'voice' => intval($tts_voice)
         );
 
         // 将配置写入页面，确保 JSON 格式正确
