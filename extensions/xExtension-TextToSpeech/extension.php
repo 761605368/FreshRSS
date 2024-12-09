@@ -88,9 +88,9 @@ class TextToSpeechExtension extends Minz_Extension {
     public function amendCsp(array &$csp): void {
         // 添加百度语音服务所需的CSP规则
         if (isset($csp['default-src'])) {
-            $csp['default-src'] .= " *.bcebos.com";
+            $csp['default-src'] .= " 'self' *.bcebos.com data:";
         } else {
-            $csp['default-src'] = "'self' *.bcebos.com";
+            $csp['default-src'] = "'self' *.bcebos.com data:";
         }
 
         // 添加media-src规则
@@ -105,6 +105,13 @@ class TextToSpeechExtension extends Minz_Extension {
             $csp['connect-src'] .= " 'self' *.bcebos.com";
         } else {
             $csp['connect-src'] = "'self' *.bcebos.com";
+        }
+
+        // 添加font-src规则
+        if (isset($csp['font-src'])) {
+            $csp['font-src'] .= " 'self' data:";
+        } else {
+            $csp['font-src'] = "'self' data:";
         }
     }
 }
