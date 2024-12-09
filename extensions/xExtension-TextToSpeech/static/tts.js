@@ -171,15 +171,26 @@ function getConfig() {
         log('未找到配置元素');
         return {};
     }
+	let config;
+	try {
+		config = JSON.parse(configElement.textContent);
+		const userConfig = JSON.parse(localStorage.getItem('ttsConfig'));
+		Object.assign(config, userConfig);
+	} catch (error) {
+		log('解析配置失败:', error);
+	}
 
+    log('成功解析配置:', config);
+    return config;
+}
+
+// 保存配置
+function saveConfig(config) {
     try {
-        const config = JSON.parse(configElement.textContent);
-        log('成功解析配置:', config);
-        return config;
+        localStorage.setItem('ttsConfig', JSON.stringify(config));
+        log('配置已保存');
     } catch (error) {
-        log('解析配置失败:', error);
-        log('配置内容:', configElement.textContent);
-        return {};
+        log('保存配置失败:', error);
     }
 }
 
@@ -194,7 +205,7 @@ async function initTTS() {
     }
 
     // 获取配置
-    const config = getConfig();
+    const config = await getConfig();
     log('TTS配置:', config);
 
     // 获取所有按钮占位符
@@ -384,6 +395,24 @@ function speakBrowser(text, button) {
         button.classList.remove('playing');
         currentUtterance = null;
         log('浏览器TTS播放完成');
+		button.classList.remove('playing');
+		if (autoPlayEnabled) {
+			// 查找下一个可播放的文章
+			log('查找下一个可播放的文章');
+			const articles = Array.from(document.querySelectorAll('.flux'));
+			const currentArticle = button.closest('.flux');
+			const currentIndex = articles.indexOf(currentArticle);
+
+			if (currentIndex >= 0 && currentIndex < articles.length - 1) {
+				const nextArticle = articles[currentIndex + 1];
+				const nextButton = nextArticle.querySelector('.tts-button');
+				if (nextButton) {
+					setTimeout(() => {
+						nextButton.click();
+					}, 1000); // 1秒后播放下一篇
+				}
+			}
+		}
     };
 
     utterance.onerror = (event) => {
@@ -574,9 +603,29 @@ async function speakBaidu(text, button) {
 
 // 播放音频
 async function playAudio(url, button, isObjectUrl = false) {
-    return new Promise((resolve, reject) => {
+    try {
         const audio = new Audio();
-        audio.preload = 'auto';
+
+        audio.addEventListener('ended', () => {
+            button.classList.remove('playing');
+            if (autoPlayEnabled) {
+                // 查找下一个可播放的文章
+				log('查找下一个可播放的文章');
+                const articles = Array.from(document.querySelectorAll('.flux'));
+                const currentArticle = button.closest('.flux');
+                const currentIndex = articles.indexOf(currentArticle);
+
+                if (currentIndex >= 0 && currentIndex < articles.length - 1) {
+                    const nextArticle = articles[currentIndex + 1];
+                    const nextButton = nextArticle.querySelector('.tts-button');
+                    if (nextButton) {
+                        setTimeout(() => {
+                            nextButton.click();
+                        }, 1000); // 1秒后播放下一篇
+                    }
+                }
+            }
+        });
 
         // 清理之前的音频对象
         if (currentUtterance instanceof Audio) {
@@ -662,7 +711,11 @@ async function playAudio(url, button, isObjectUrl = false) {
         };
 
         audio.src = url;
-    });
+    } catch (error) {
+        log('播放错误:', error);
+        button.classList.remove('playing');
+        throw error;
+    }
 }
 
 // 获取百度访问令牌
@@ -718,16 +771,121 @@ async function getBaiduToken(apiKey, secretKey) {
     }
 }
 
+// 全局变量
+let autoPlayEnabled = false;
+let shutdownTimer = null;
+let shutdownMinutes = 0;
+
+// 创建TTS控制面板
+function createTTSControls() {
+    const controls = document.createElement('div');
+    controls.className = 'tts-controls';
+    controls.style.position = 'fixed';
+    controls.style.bottom = '20px';
+    controls.style.right = '20px';
+    controls.style.padding = '10px';
+    controls.style.background = 'white';
+    controls.style.border = '1px solid #ccc';
+    controls.style.borderRadius = '5px';
+    controls.style.zIndex = '1000';
+
+    const autoPlayCheckbox = document.createElement('input');
+    autoPlayCheckbox.type = 'checkbox';
+    autoPlayCheckbox.id = 'tts-autoplay';
+    const autoPlayLabel = document.createElement('label');
+    autoPlayLabel.htmlFor = 'tts-autoplay';
+    autoPlayLabel.textContent = '自动播放下一篇';
+
+    const timerInput = document.createElement('input');
+    timerInput.type = 'number';
+    timerInput.min = '0';
+    timerInput.style.width = '60px';
+    timerInput.placeholder = '分钟';
+
+    const timerButton = document.createElement('button');
+    timerButton.textContent = '设置定时关闭';
+    timerButton.style.marginLeft = '5px';
+
+    const timerDisplay = document.createElement('div');
+    timerDisplay.style.marginTop = '5px';
+
+    controls.appendChild(autoPlayCheckbox);
+    controls.appendChild(autoPlayLabel);
+    controls.appendChild(document.createElement('br'));
+    controls.appendChild(timerInput);
+    controls.appendChild(timerButton);
+    controls.appendChild(timerDisplay);
+
+    document.body.appendChild(controls);
+
+    // 事件处理
+    autoPlayCheckbox.addEventListener('change', (e) => {
+        autoPlayEnabled = e.target.checked;
+        saveConfig({ ...getConfig(), autoPlay: autoPlayEnabled });
+    });
+
+    timerButton.addEventListener('click', () => {
+        const minutes = parseInt(timerInput.value);
+        if (minutes > 0) {
+            setShutdownTimer(minutes, timerDisplay);
+        } else {
+            clearShutdownTimer();
+        }
+        timerInput.value = '';
+    });
+
+    return controls;
+}
+
+// 设置定时关闭
+function setShutdownTimer(minutes, display) {
+    clearShutdownTimer();
+    shutdownMinutes = minutes;
+    const endTime = Date.now() + minutes * 60 * 1000;
+
+    function updateDisplay() {
+        const remaining = Math.max(0, endTime - Date.now());
+        const remainingMinutes = Math.floor(remaining / 60000);
+        const remainingSeconds = Math.floor((remaining % 60000) / 1000);
+        display.textContent = `将在 ${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')} 后关闭`;
+
+        if (remaining <= 0) {
+            stopSpeaking();
+            autoPlayEnabled = false;
+            display.textContent = '';
+            document.getElementById('tts-autoplay').checked = false;
+            saveConfig({ ...getConfig(), autoPlay: false });
+        }
+    }
+
+    shutdownTimer = setInterval(updateDisplay, 1000);
+    updateDisplay();
+}
+
+// 清除定时器
+function clearShutdownTimer() {
+    if (shutdownTimer) {
+        clearInterval(shutdownTimer);
+        shutdownTimer = null;
+    }
+}
+
 // 在页面加载完成后初始化
 if (document.readyState === 'loading') {
-    log('Document readyState:', document.readyState);
     document.addEventListener('DOMContentLoaded', async () => {
-        await initDatabase();
-        initTTS();
+        try {
+            await initDatabase();
+            await initTTS();
+            createTTSControls();
+        } catch (error) {
+            log('初始化失败:', error);
+        }
     });
 } else {
-    log('Document readyState:', document.readyState);
     initDatabase().then(() => {
         initTTS();
+        createTTSControls();
+    }).catch(error => {
+        log('初始化失败:', error);
     });
 }
