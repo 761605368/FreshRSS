@@ -156,7 +156,7 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
 
             $text = Minz_Request::param('text');
             $token = Minz_Request::param('token');
-            $voice = intval(Minz_Request::param('voice', 0));
+            $voice = intval(Minz_Request::param('voice', 5118));
             $format = Minz_Request::param('format', 'mp3-16k');
 
             Minz_Log::debug('TTS: Received parameters - text length: ' . strlen($text) . ', token: ' . substr($token, 0, 10) . '...');
@@ -316,12 +316,12 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
         // 将文本按句号分段，每段不超过2000字
         $segments = array();
         $sentences = preg_split('/(?<=[。！？.!?])/u', $text, -1, PREG_SPLIT_NO_EMPTY);
-        
+
         $currentSegment = '';
         foreach ($sentences as $sentence) {
             $sentence = trim($sentence);
             if (empty($sentence)) continue;
-            
+
             if (mb_strlen($currentSegment . $sentence, 'UTF-8') > 2000) {
                 if (!empty($currentSegment)) {
                     $segments[] = $currentSegment;
@@ -339,14 +339,14 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
                 $currentSegment .= ($currentSegment ? ' ' : '') . $sentence;
             }
         }
-        
+
         if (!empty($currentSegment)) {
             $segments[] = $currentSegment;
         }
 
-        Minz_Log::debug('TTS: Text segmentation - Original length: ' . mb_strlen($text, 'UTF-8') . 
+        Minz_Log::debug('TTS: Text segmentation - Original length: ' . mb_strlen($text, 'UTF-8') .
                        ', Segments: ' . count($segments));
-        
+
         return $segments;
     }
 }

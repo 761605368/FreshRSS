@@ -72,4 +72,13 @@ class TextToSpeechExtension extends Minz_Extension {
 
         return $entry;
     }
+
+    public function amendCsp(array &$csp): void {
+        // Add blob: to media-src directive
+        if (isset($csp['media-src'])) {
+            $csp['media-src'] .= " blob:";
+        } else {
+            $csp['media-src'] = "'self' blob:";
+        }
+    }
 }

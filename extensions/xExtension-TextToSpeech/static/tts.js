@@ -7,6 +7,158 @@ function log(...args) {
 let currentUtterance = null;
 let speechSynthesis = window.speechSynthesis;
 
+// IndexedDB配置
+const DB_NAME = 'TTSCache';
+const STORE_NAME = 'audioCache';
+let db = null;
+
+// 初始化数据库
+async function initDatabase() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+
+        request.onerror = () => {
+            log('数据库打开失败:', request.error);
+            reject(request.error);
+        };
+
+        request.onsuccess = () => {
+            db = request.result;
+            log('数据库打开成功');
+            resolve(db);
+        };
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'hash' });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('size', 'size', { unique: false });
+                log('创建数据库存储空间');
+            }
+        };
+    });
+}
+
+// 生成文本的哈希值
+function generateHash(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+        const char = text.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString();
+}
+
+// 从缓存获取音频
+async function getFromCache(hash) {
+    if (!db) {
+        log('数据库未初始化');
+        return null;
+    }
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(hash);
+
+        request.onsuccess = () => {
+            const result = request.result;
+            if (result && result.audioBlob) {
+                log('从缓存获取到音频, hash:', hash);
+                resolve(result);
+            } else {
+                log('缓存中未找到音频, hash:', hash);
+                resolve(null);
+            }
+        };
+
+        request.onerror = () => {
+            log('读取缓存失败:', request.error);
+            reject(request.error);
+        };
+    });
+}
+
+// 保存音频到缓存
+async function saveToCache(hash, audioBlob) {
+    if (!db) {
+        log('数据库未初始化');
+        return;
+    }
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+
+        // 清理旧缓存
+        cleanOldCache().catch(error => log('清理旧缓存失败:', error));
+
+        const request = store.put({
+            hash: hash,
+            audioBlob: audioBlob,
+            timestamp: Date.now(),
+            size: audioBlob.size
+        });
+
+        request.onsuccess = () => {
+            log('音频已缓存, hash:', hash);
+            resolve();
+        };
+
+        request.onerror = () => {
+            log('缓存音频失败:', request.error);
+            reject(request.error);
+        };
+    });
+}
+
+// 清理旧缓存
+async function cleanOldCache() {
+    const MAX_CACHE_SIZE = 100 * 1024 * 1024; // 100MB
+    const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7天
+
+    if (!db) return;
+
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.openCursor();
+
+    let totalSize = 0;
+    const now = Date.now();
+    const itemsToDelete = [];
+
+    return new Promise((resolve, reject) => {
+        request.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (cursor) {
+                totalSize += cursor.value.size || 0;
+                
+                // 检查是否过期或总大小超限
+                if (now - cursor.value.timestamp > MAX_CACHE_AGE || totalSize > MAX_CACHE_SIZE) {
+                    itemsToDelete.push(cursor.value.hash);
+                }
+                cursor.continue();
+            } else {
+                // 删除过期或超限的缓存
+                itemsToDelete.forEach(hash => {
+                    store.delete(hash);
+                });
+                if (itemsToDelete.length > 0) {
+                    log('清理了', itemsToDelete.length, '个缓存项');
+                }
+                resolve();
+            }
+        };
+
+        request.onerror = () => {
+            log('清理缓存失败:', request.error);
+            reject(request.error);
+        };
+    });
+}
+
 // 获取配置
 function getConfig() {
     const configElement = document.getElementById('tts-config');
@@ -27,7 +179,7 @@ function getConfig() {
 }
 
 // 初始化TTS功能
-function initTTS() {
+async function initTTS() {
     log('Starting TTS initialization');
 
     // 检查是否已经初始化
@@ -206,13 +358,7 @@ async function startSpeaking(text, button) {
     log('使用语音服务:', service);
 
     if (service === 'baidu') {
-        button.classList.add('loading');
-        try {
-            await speakBaidu(text, button);
-        } catch (error) {
-            button.classList.remove('loading');
-            throw error;
-        }
+        await speakBaidu(text, button);
     } else {
         speakBrowser(text, button);
     }
@@ -258,9 +404,16 @@ async function speakBaidu(text, button) {
             throw new Error('未配置百度语音API密钥');
         }
 
-        // 停止当前播放
-        if (currentUtterance) {
-            stopSpeaking();
+        // 生成文本的哈希值
+        const hash = generateHash(text);
+        
+        // 尝试从缓存获取
+        const cachedAudio = await getFromCache(hash);
+        if (cachedAudio) {
+            log('使用缓存的音频');
+            const audioUrl = URL.createObjectURL(cachedAudio.audioBlob);
+            await playAudio(audioUrl, button, true);
+            return;
         }
 
         button.classList.add('loading');
@@ -349,7 +502,6 @@ async function speakBaidu(text, button) {
             }
 
             const taskInfo = queryResult.tasks_info[0];
-
             if (!taskInfo) {
                 throw new Error('未找到任务信息');
             }
@@ -362,80 +514,22 @@ async function speakBaidu(text, button) {
                     throw new Error('未找到音频URL');
                 }
 
-                // 创建音频对象并播放
-                const audio = new Audio();
-                audio.preload = 'auto';
-
-                // 清理之前的音频对象
-                if (currentUtterance instanceof Audio) {
-                    stopSpeaking();
+                // 下载音频数据并缓存
+                log('下载音频数据');
+                const audioResponse = await fetch(audioUrl);
+                if (!audioResponse.ok) {
+                    throw new Error('下载音频失败');
                 }
 
-                // 设置新的音频对象
-                currentUtterance = audio;
+                const audioBlob = await audioResponse.blob();
+                log('音频大小:', audioBlob.size, 'bytes');
 
-                audio.onloadedmetadata = () => {
-                    log('音频时长:', audio.duration, '秒');
-                };
+                // 缓存音频数据
+                await saveToCache(hash, audioBlob);
 
-                audio.oncanplaythrough = async () => {
-                    if (audio !== currentUtterance) {
-                        log('音频已被替换，取消播放');
-                        return;
-                    }
-                    log('音频已加载，开始播放');
-                    button.classList.remove('loading');
-                    button.classList.add('playing');
-                    try {
-                        await audio.play();
-                    } catch (error) {
-                        log('播放失败:', error);
-                        button.classList.remove('playing', 'loading');
-                        currentUtterance = null;
-                        button.setAttribute('title', '播放失败: ' + error.message);
-                    }
-                };
-
-                audio.onended = () => {
-                    if (audio === currentUtterance) {
-                        log('播放完成');
-                        button.classList.remove('playing');
-                        currentUtterance = null;
-                        button.setAttribute('title', '朗读文本');
-                    }
-                };
-
-                audio.onpause = () => {
-                    if (audio === currentUtterance && !audio.ended) {
-                        log('音频已暂停');
-                        button.classList.remove('playing');
-                        button.setAttribute('title', '继续播放');
-                    }
-                };
-
-                audio.onplay = () => {
-                    if (audio === currentUtterance) {
-                        log('音频开始/继续播放');
-                        button.classList.add('playing');
-                        button.setAttribute('title', '点击暂停');
-                    } else {
-                        log('检测到旧音频播放，停止');
-                        audio.pause();
-                        audio.currentTime = 0;
-                    }
-                };
-
-                audio.onerror = (e) => {
-                    if (audio === currentUtterance) {
-                        const error = e.target.error;
-                        log('播放错误:', error ? error.message : '未知错误');
-                        button.classList.remove('loading', 'playing');
-                        currentUtterance = null;
-                        button.setAttribute('title', '播放失败: ' + (error ? error.message : '未知错误'));
-                    }
-                };
-
-                audio.src = audioUrl;
+                // 创建本地URL并播放
+                const localUrl = URL.createObjectURL(audioBlob);
+                await playAudio(localUrl, button, true);
                 return;
             } else if (taskInfo.task_status === 'Failed') {
                 throw new Error('合成任务失败: ' + (taskInfo.task_result?.err_msg || '未知错误'));
@@ -453,8 +547,101 @@ async function speakBaidu(text, button) {
         log('百度TTS错误:', error);
         button.classList.remove('loading', 'playing');
         button.setAttribute('title', '朗读文本');
-        alert('语音合成失败: ' + error.message);
+        throw error;
     }
+}
+
+// 播放音频
+async function playAudio(url, button, isObjectUrl = false) {
+    return new Promise((resolve, reject) => {
+        const audio = new Audio();
+        audio.preload = 'auto';
+
+        // 清理之前的音频对象
+        if (currentUtterance instanceof Audio) {
+            stopSpeaking();
+        }
+
+        // 设置新的音频对象
+        currentUtterance = audio;
+
+        const cleanup = () => {
+            if (isObjectUrl) {
+                URL.revokeObjectURL(url);
+            }
+        };
+
+        audio.onloadedmetadata = () => {
+            log('音频时长:', audio.duration, '秒');
+        };
+
+        audio.oncanplaythrough = async () => {
+            if (audio !== currentUtterance) {
+                cleanup();
+                log('音频已被替换，取消播放');
+                return;
+            }
+            log('音频已加载，开始播放');
+            button.classList.remove('loading');
+            button.classList.add('playing');
+            try {
+                await audio.play();
+                resolve();
+            } catch (error) {
+                log('播放失败:', error);
+                cleanup();
+                button.classList.remove('playing', 'loading');
+                currentUtterance = null;
+                button.setAttribute('title', '播放失败: ' + error.message);
+                reject(error);
+            }
+        };
+
+        audio.onended = () => {
+            if (audio === currentUtterance) {
+                log('播放完成');
+                cleanup();
+                button.classList.remove('playing');
+                currentUtterance = null;
+                button.setAttribute('title', '朗读文本');
+            }
+        };
+
+        audio.onpause = () => {
+            if (audio === currentUtterance && !audio.ended) {
+                log('音频已暂停');
+                button.classList.remove('playing');
+                button.setAttribute('title', '继续播放');
+            }
+        };
+
+        audio.onplay = () => {
+            if (audio === currentUtterance) {
+                log('音频开始/继续播放');
+                button.classList.add('playing');
+                button.setAttribute('title', '点击暂停');
+            } else {
+                log('检测到旧音频播放，停止');
+                cleanup();
+                audio.pause();
+                audio.currentTime = 0;
+            }
+        };
+
+        audio.onerror = (e) => {
+            if (audio === currentUtterance) {
+                const error = e.target.error;
+                log('播放错误:', error ? error.message : '未知错误');
+                cleanup();
+                button.classList.remove('loading', 'playing');
+                currentUtterance = null;
+                button.setAttribute('title', '播放失败: ' + (error ? error.message : '未知错误'));
+                reject(error);
+            }
+        };
+
+        audio.src = url;
+    });
 }
 
 // 获取百度访问令牌
@@ -513,8 +700,13 @@ async function getBaiduToken(apiKey, secretKey) {
 // 在页面加载完成后初始化
 if (document.readyState === 'loading') {
     log('Document readyState:', document.readyState);
-    document.addEventListener('DOMContentLoaded', initTTS);
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initDatabase();
+        initTTS();
+    });
 } else {
     log('Document readyState:', document.readyState);
-    initTTS();
+    initDatabase().then(() => {
+        initTTS();
+    });
 }
