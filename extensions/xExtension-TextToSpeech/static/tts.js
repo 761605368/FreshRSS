@@ -775,6 +775,7 @@ async function getBaiduToken(apiKey, secretKey) {
 let autoPlayEnabled = false;
 let shutdownTimer = null;
 let shutdownMinutes = 0;
+let shutdownFirstFlag = true;
 
 // 创建TTS控制面板
 function createTTSControls() {
@@ -849,7 +850,8 @@ function setShutdownTimer(minutes, display) {
         const remainingSeconds = Math.floor((remaining % 60000) / 1000);
         display.textContent = `将在 ${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')} 后关闭`;
 
-        if (remaining <= 0) {
+        if (remaining <= 0 && shutdownFirstFlag) {
+			shutdownFirstFlag = false;
             stopSpeaking();
             autoPlayEnabled = false;
             display.textContent = '';
