@@ -522,7 +522,22 @@ async function speakBaidu(text, button) {
 
                 // 下载音频数据并缓存
                 log('下载音频数据');
-                const audioResponse = await fetch(audioUrl);
+				// 创建合成任务
+				const downloadAudioDataUrl = new URL('./index.php', window.location.href);
+				downloadAudioDataUrl.searchParams.set('c', 'TextToSpeech');
+				downloadAudioDataUrl.searchParams.set('a', 'downloadAudio');
+
+				const downloadAudioData = new FormData();
+				downloadAudioData.append('url', audioUrl);
+				downloadAudioData.append('_csrf', window.context.csrf);
+
+				const audioResponse = await fetch(downloadAudioDataUrl.toString(), {
+					method: 'POST',
+					body: downloadAudioData,
+					headers: {
+						'X-Requested-With': 'XMLHttpRequest'
+					}
+				});
                 if (!audioResponse.ok) {
                     throw new Error('下载音频失败');
                 }

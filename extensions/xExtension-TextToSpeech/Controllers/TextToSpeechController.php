@@ -306,6 +306,31 @@ class FreshExtension_TextToSpeech_Controller extends Minz_ActionController {
         }
     }
 
+    public function downloadAudioAction() {
+        $url = Minz_Request::param('url', '');
+        if (empty($url)) {
+            header('HTTP/1.1 400 Bad Request');
+            die('URL parameter is required');
+        }
+
+        // 下载音频文件
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        $audioData = curl_exec($ch);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+
+        if (empty($audioData)) {
+            header('HTTP/1.1 500 Internal Server Error');
+            die('Failed to download audio file');
+        }
+
+        // 输出音频
+        header('Content-Type: ' . ($contentType ?: 'audio/mpeg'));
+        echo $audioData;
+    }
+
     private function splitText($text) {
         // 清理和预处理文本
         $text = trim($text);
